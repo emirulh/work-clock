@@ -1,6 +1,6 @@
 "use strict";
 
-var CACHE_NAME = "work-clock-v1";
+var CACHE_NAME = "kirajam-v2";
 var ASSETS = [
   "./",
   "./index.html",

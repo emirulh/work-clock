@@ -56,11 +56,23 @@
     return { startMs: start, endMs: end };
   }
 
+  function pad2(n) {
+    return n < 10 ? "0" + String(n) : String(n);
+  }
+
+  function formatHms(ms) {
+    var totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(totalSeconds / 3600);
+    var m = Math.floor((totalSeconds % 3600) / 60);
+    var s = totalSeconds % 60;
+    return pad2(h) + ":" + pad2(m) + ":" + pad2(s);
+  }
+
   function formatHours(hours) {
     if (!hours || hours <= 0) {
       return "0.00";
     }
-    // Keep 4 decimals under 36s so short prototype test punches show real pay.
+    // Keep 4 decimals under 36s so quick prototype test punches show real pay.
     if (hours < 0.01) {
       return hours.toFixed(4);
     }
@@ -72,21 +84,16 @@
     return "RM " + safe.toFixed(2);
   }
 
-  function formatDurationExact(ms) {
-    var totalSeconds = Math.max(0, Math.floor(ms / 1000));
-    var h = Math.floor(totalSeconds / 3600);
-    var m = Math.floor((totalSeconds % 3600) / 60);
-    var s = totalSeconds % 60;
-    return h + "h " + m + "m " + s + "s";
-  }
-
-  function calculateTodaySummary(punches, rate, nowMs) {
+  function calculateDaySummary(punches, rate, dayMs, nowMs) {
     var list = Array.isArray(punches) ? punches : [];
     var safeRate = Number.isFinite(rate) && rate > 0 ? rate : 0;
-    var bounds = getDayBounds(typeof nowMs === "number" ? nowMs : Date.now());
+    var refNow = typeof nowMs === "number" ? nowMs : Date.now();
+    var bounds = getDayBounds(typeof dayMs === "number" ? dayMs : refNow);
     var openIn = null;
     var completedMs = 0;
     var pairDurationsByOutId = {};
+    var latestInMs = null;
+    var latestOutMs = null;
 
     for (var i = 0; i < list.length; i++) {
       var entry = list[i];
@@ -95,23 +102,37 @@
       }
       if (entry.type === "IN") {
         openIn = entry;
+        if (entry.ms >= bounds.startMs && entry.ms < bounds.endMs) {
+          latestInMs = entry.ms;
+        }
       } else if (entry.type === "OUT" && openIn !== null) {
-        var totalPairMs = Math.max(0, entry.ms - openIn.ms);
-        pairDurationsByOutId[entry.id] = totalPairMs;
+        pairDurationsByOutId[entry.id] = Math.max(0, entry.ms - openIn.ms);
         var clippedStart = Math.max(openIn.ms, bounds.startMs);
         var clippedEnd = Math.min(entry.ms, bounds.endMs);
         if (clippedEnd > clippedStart) {
           completedMs += clippedEnd - clippedStart;
         }
+        if (entry.ms >= bounds.startMs && entry.ms < bounds.endMs) {
+          latestOutMs = entry.ms;
+        }
         openIn = null;
       }
     }
 
-    var todayPunches = [];
+    var activeMs = 0;
+    if (openIn !== null) {
+      var activeStart = Math.max(openIn.ms, bounds.startMs);
+      var activeEnd = Math.min(refNow, bounds.endMs);
+      if (activeEnd > activeStart) {
+        activeMs = activeEnd - activeStart;
+      }
+    }
+
+    var dayPunches = [];
     for (var j = 0; j < list.length; j++) {
       var item = list[j];
       if (item && typeof item.ms === "number" && item.ms >= bounds.startMs && item.ms < bounds.endMs) {
-        todayPunches.push({
+        dayPunches.push({
           id: item.id,
           type: item.type,
           ms: item.ms,
@@ -121,20 +142,67 @@
       }
     }
 
-    var hoursWorked = completedMs / 3600000;
-    var totalEarned = Math.round(safeRate * hoursWorked * 100) / 100;
+    var totalMs = completedMs + activeMs;
+    var completedHours = completedMs / 3600000;
+    var liveHours = totalMs / 3600000;
+    var completedEarned = Math.round(safeRate * completedHours * 100) / 100;
+    var liveEarned = Math.round(safeRate * liveHours * 100) / 100;
 
     return {
       isClockedIn: openIn !== null,
       activeSinceMs: openIn ? openIn.ms : null,
+      latestInMs: latestInMs,
+      latestOutMs: latestOutMs,
       completedMs: completedMs,
-      completedExactText: formatDurationExact(completedMs),
-      hoursWorked: hoursWorked,
-      hoursText: formatHours(hoursWorked),
+      totalMs: totalMs,
+      liveHms: formatHms(totalMs),
+      hoursWorked: completedHours,
+      liveHoursWorked: liveHours,
+      hoursText: formatHours(liveHours),
       rateText: formatRM(safeRate),
-      totalEarned: totalEarned,
-      earnedText: formatRM(totalEarned),
-      todayPunches: todayPunches
+      totalEarned: completedEarned,
+      liveEarned: liveEarned,
+      earnedText: formatRM(liveEarned),
+      dayPunches: dayPunches
+    };
+  }
+
+  function calculateTodaySummary(punches, rate, nowMs) {
+    var ts = typeof nowMs === "number" ? nowMs : Date.now();
+    return calculateDaySummary(punches, rate, ts, ts);
+  }
+
+  function getMonthSummary(punches, rate, year, month, nowMs) {
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var firstWeekday = new Date(year, month, 1).getDay();
+    var days = [];
+    var monthTotalMs = 0;
+    var monthTotalEarned = 0;
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dayMid = new Date(year, month, d, 12, 0, 0, 0).getTime();
+      var summary = calculateDaySummary(punches, rate, dayMid, nowMs);
+      monthTotalMs += summary.totalMs;
+      monthTotalEarned += summary.liveEarned;
+      days.push({
+        day: d,
+        dayMs: dayMid,
+        hasPunches: summary.dayPunches.length > 0 || summary.totalMs > 0,
+        totalMs: summary.totalMs,
+        hms: summary.liveHms,
+        earnedText: summary.earnedText,
+        punches: summary.dayPunches
+      });
+    }
+
+    return {
+      year: year,
+      month: month,
+      firstWeekday: firstWeekday,
+      daysInMonth: daysInMonth,
+      days: days,
+      monthHoursText: formatHours(monthTotalMs / 3600000),
+      monthEarnedText: formatRM(Math.round(monthTotalEarned * 100) / 100)
     };
   }
 
@@ -143,9 +211,11 @@
     getNextAction: getNextAction,
     recordPunch: recordPunch,
     getDayBounds: getDayBounds,
+    formatHms: formatHms,
     formatHours: formatHours,
     formatRM: formatRM,
-    formatDurationExact: formatDurationExact,
-    calculateTodaySummary: calculateTodaySummary
+    calculateDaySummary: calculateDaySummary,
+    calculateTodaySummary: calculateTodaySummary,
+    getMonthSummary: getMonthSummary
   };
 });

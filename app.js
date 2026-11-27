@@ -8,37 +8,61 @@
   var Logic = window.WorkClockLogic;
 
   var els = {
-    themeToggle: document.getElementById("theme-toggle"),
     metaThemeColor: document.getElementById("meta-theme-color"),
+    rateChip: document.getElementById("rate-chip"),
+    themeToggle: document.getElementById("theme-toggle"),
     storageError: document.getElementById("storage-error"),
     storageErrorText: document.getElementById("storage-error-text"),
     resetStorageBtn: document.getElementById("reset-storage-btn"),
-    todayDate: document.getElementById("today-date"),
+    liveDate: document.getElementById("live-date"),
+    liveClock: document.getElementById("live-clock"),
     punchBtn: document.getElementById("punch-btn"),
     punchStatus: document.getElementById("punch-status"),
-    rateInput: document.getElementById("hourly-rate"),
-    rateError: document.getElementById("rate-error"),
-    eqRate: document.getElementById("eq-rate"),
-    eqHours: document.getElementById("eq-hours"),
-    eqTotal: document.getElementById("eq-total"),
-    eqDuration: document.getElementById("eq-duration"),
+    cardInTime: document.getElementById("card-in-time"),
+    cardOutTime: document.getElementById("card-out-time"),
+    cardTimer: document.getElementById("card-timer"),
+    cardEarned: document.getElementById("card-earned"),
+    cardFormula: document.getElementById("card-formula"),
+    cardRateTrigger: document.getElementById("card-rate-trigger"),
+    tabButtons: Array.prototype.slice.call(document.querySelectorAll("[data-tab-target]")),
+    tabPanels: {
+      calendar: document.getElementById("view-calendar"),
+      clock: document.getElementById("view-clock"),
+      logs: document.getElementById("view-logs")
+    },
+    calPrev: document.getElementById("cal-prev"),
+    calNext: document.getElementById("cal-next"),
+    calMonthLabel: document.getElementById("cal-month-label"),
+    calMonthSummary: document.getElementById("cal-month-summary"),
+    calGrid: document.getElementById("cal-grid"),
+    calDayTitle: document.getElementById("cal-day-title"),
+    calDayEmpty: document.getElementById("cal-day-empty"),
+    calDayList: document.getElementById("cal-day-list"),
     logLoading: document.getElementById("log-loading"),
     logEmpty: document.getElementById("log-empty"),
     logList: document.getElementById("log-list"),
     openClearBtn: document.getElementById("open-clear-btn"),
+    rateDialog: document.getElementById("rate-dialog"),
+    rateInput: document.getElementById("hourly-rate"),
+    rateError: document.getElementById("rate-error"),
+    closeRateBtn: document.getElementById("close-rate-btn"),
     clearDialog: document.getElementById("clear-dialog"),
     cancelClearBtn: document.getElementById("cancel-clear-btn"),
-    confirmClearBtn: document.getElementById("confirm-clear-btn"),
-    iosInstallHelp: document.getElementById("ios-install-help")
+    confirmClearBtn: document.getElementById("confirm-clear-btn")
   };
 
+  var nowInit = new Date();
   var state = {
     punches: [],
     rawRate: "",
-    storageFailed: false
+    storageFailed: false,
+    activeTab: "clock",
+    calYear: nowInit.getFullYear(),
+    calMonth: nowInit.getMonth(),
+    selectedDay: nowInit.getDate()
   };
 
-  function formatDateLabel(ms) {
+  function formatDateShort(ms) {
     return new Date(ms).toLocaleDateString("en-MY", {
       weekday: "short",
       day: "2-digit",
@@ -47,25 +71,41 @@
     });
   }
 
-  function formatTimeLabel(ms) {
+  function formatTimeShort(ms) {
     return new Date(ms).toLocaleTimeString("en-MY", {
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
       hour12: true
     });
   }
 
+  function formatClockFull(ms) {
+    return new Date(ms).toLocaleTimeString("en-MY", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+  }
+
+  function formatMonthTitle(year, month) {
+    return new Date(year, month, 1).toLocaleDateString("en-MY", {
+      month: "long",
+      year: "numeric"
+    });
+  }
+
   function applyTheme(theme) {
-    var active = theme === "dark" ? "dark" : "light";
+    var active = theme === "light" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", active);
     if (els.metaThemeColor) {
-      els.metaThemeColor.setAttribute("content", active === "dark" ? "#121316" : "#F6F4EF");
+      els.metaThemeColor.setAttribute("content", active === "light" ? "#F6F4EF" : "#171717");
     }
     if (els.themeToggle) {
       var isDark = active === "dark";
       els.themeToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
-      els.themeToggle.textContent = isDark ? "Switch to light theme" : "Switch to dark theme";
+      els.themeToggle.textContent = isDark ? "Light" : "Dark";
+      els.themeToggle.setAttribute("aria-label", isDark ? "Switch to light theme" : "Switch to dark theme");
     }
   }
 
@@ -76,12 +116,8 @@
     } catch (_) {
       saved = null;
     }
-    if (saved === "dark" || saved === "light") {
-      applyTheme(saved);
-      return;
-    }
-    var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    applyTheme(prefersDark ? "dark" : "light");
+    // Default to dark theme to match the KIRAJAM Figma design unless user toggled light.
+    applyTheme(saved === "light" ? "light" : "dark");
   }
 
   function loadState() {
@@ -119,17 +155,78 @@
     }
   }
 
-  function render() {
-    var nowMs = Date.now();
-    els.todayDate.textContent = "Today: " + formatDateLabel(nowMs);
+  function setTab(tabName) {
+    if (!els.tabPanels[tabName]) {
+      return;
+    }
+    state.activeTab = tabName;
+    for (var i = 0; i < els.tabButtons.length; i++) {
+      var btn = els.tabButtons[i];
+      var isActive = btn.getAttribute("data-tab-target") === tabName;
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+      btn.setAttribute("data-active", isActive ? "true" : "false");
+    }
+    var keys = Object.keys(els.tabPanels);
+    for (var k = 0; k < keys.length; k++) {
+      els.tabPanels[keys[k]].hidden = keys[k] !== tabName;
+    }
+    render();
+  }
 
-    els.storageError.hidden = !state.storageFailed;
-    if (state.storageFailed) {
-      els.storageErrorText.textContent =
-        "Saved records could not be read or written in browser storage. Reset local data to clear the error.";
+  function buildPunchRow(item) {
+    var li = document.createElement("li");
+    li.className = "log-row";
+
+    var left = document.createElement("div");
+    left.className = "log-left";
+
+    var stamp = document.createElement("span");
+    stamp.className = item.type === "OUT" ? "stamp stamp-out" : "stamp stamp-in";
+    stamp.textContent = item.type;
+
+    var timeLine = document.createElement("span");
+    timeLine.className = "log-time";
+    timeLine.textContent = formatTimeShort(item.ms);
+
+    left.appendChild(stamp);
+    left.appendChild(timeLine);
+
+    var dateLine = document.createElement("span");
+    dateLine.className = "log-date";
+    dateLine.textContent = formatDateShort(item.ms);
+
+    li.appendChild(left);
+    li.appendChild(dateLine);
+    return li;
+  }
+
+  function renderClockView(summary, rateCheck, nowMs) {
+    els.liveDate.textContent = formatDateShort(nowMs);
+    els.liveClock.textContent = formatClockFull(nowMs);
+    els.rateChip.textContent = summary.rateText + "/hr";
+
+    if (summary.isClockedIn) {
+      els.punchBtn.setAttribute("data-state", "out");
+      els.punchBtn.textContent = "OUT";
+      els.punchBtn.setAttribute("aria-label", "Tap OUT to clock out and stop shift");
+      els.punchStatus.textContent = "Clocked in since " + formatTimeShort(summary.activeSinceMs);
+    } else {
+      els.punchBtn.setAttribute("data-state", "in");
+      els.punchBtn.textContent = "IN";
+      els.punchBtn.setAttribute("aria-label", "Tap IN to clock in and start shift");
+      els.punchStatus.textContent = "Tap IN when your shift starts";
     }
 
-    var rateCheck = Logic.parseRate(state.rawRate);
+    els.cardInTime.textContent = summary.latestInMs ? formatTimeShort(summary.latestInMs) : "Not yet";
+    els.cardOutTime.textContent = summary.isClockedIn
+      ? "Active"
+      : (summary.latestOutMs ? formatTimeShort(summary.latestOutMs) : "Not yet");
+
+    els.cardTimer.textContent = summary.liveHms;
+    els.cardEarned.textContent = summary.earnedText + " today";
+    els.cardFormula.textContent =
+      "(" + summary.rateText + ") x (" + summary.hoursText + " hrs) = " + summary.earnedText;
+
     if (!rateCheck.valid) {
       els.rateError.hidden = false;
       els.rateError.textContent = rateCheck.error;
@@ -139,36 +236,66 @@
       els.rateError.textContent = "";
       els.rateInput.removeAttribute("aria-invalid");
     }
+  }
 
-    var summary = Logic.calculateTodaySummary(
-      state.punches,
-      rateCheck.valid ? rateCheck.rate : 0,
-      nowMs
-    );
+  function renderCalendarView(rate, nowMs) {
+    var monthData = Logic.getMonthSummary(state.punches, rate, state.calYear, state.calMonth, nowMs);
+    els.calMonthLabel.textContent = formatMonthTitle(state.calYear, state.calMonth);
+    els.calMonthSummary.textContent =
+      monthData.monthHoursText + " hrs total | " + monthData.monthEarnedText;
 
-    if (summary.isClockedIn) {
-      els.punchBtn.setAttribute("data-state", "out");
-      els.punchBtn.textContent = "OUT";
-      els.punchBtn.setAttribute("aria-label", "Tap OUT to clock out and record date and time");
-      els.punchStatus.textContent =
-        "Clocked IN on " +
-        formatDateLabel(summary.activeSinceMs) +
-        " at " +
-        formatTimeLabel(summary.activeSinceMs) +
-        ". Tap OUT to finish this shift.";
-    } else {
-      els.punchBtn.setAttribute("data-state", "in");
-      els.punchBtn.textContent = "IN";
-      els.punchBtn.setAttribute("aria-label", "Tap IN to clock in and record date and time");
-      els.punchStatus.textContent = "Currently clocked out. Tap IN to start recording work time.";
+    if (state.selectedDay > monthData.daysInMonth) {
+      state.selectedDay = monthData.daysInMonth;
     }
 
-    els.eqRate.textContent = summary.rateText;
-    els.eqHours.textContent = summary.hoursText + " hrs";
-    els.eqTotal.textContent = summary.earnedText;
-    els.eqDuration.textContent =
-      "Completed time today: " + summary.completedExactText;
+    els.calGrid.innerHTML = "";
+    for (var pad = 0; pad < monthData.firstWeekday; pad++) {
+      var spacer = document.createElement("span");
+      spacer.className = "cal-spacer";
+      spacer.setAttribute("aria-hidden", "true");
+      els.calGrid.appendChild(spacer);
+    }
 
+    var selectedEntry = monthData.days[state.selectedDay - 1] || monthData.days[0];
+    for (var i = 0; i < monthData.days.length; i++) {
+      var d = monthData.days[i];
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "cal-cell";
+      cell.textContent = String(d.day);
+      cell.setAttribute("data-day", String(d.day));
+      if (d.hasPunches) {
+        cell.setAttribute("data-has-work", "true");
+      }
+      if (d.day === state.selectedDay) {
+        cell.setAttribute("aria-pressed", "true");
+        cell.setAttribute("data-selected", "true");
+      } else {
+        cell.setAttribute("aria-pressed", "false");
+      }
+      cell.setAttribute(
+        "aria-label",
+        formatDateShort(d.dayMs) + (d.hasPunches ? ", " + d.earnedText : ", no shifts")
+      );
+      els.calGrid.appendChild(cell);
+    }
+
+    els.calDayTitle.textContent =
+      formatDateShort(selectedEntry.dayMs) + " (" + selectedEntry.hms + " | " + selectedEntry.earnedText + ")";
+    els.calDayList.innerHTML = "";
+    if (selectedEntry.punches.length === 0) {
+      els.calDayEmpty.hidden = false;
+      els.calDayList.hidden = true;
+    } else {
+      els.calDayEmpty.hidden = true;
+      els.calDayList.hidden = false;
+      for (var p = 0; p < selectedEntry.punches.length; p++) {
+        els.calDayList.appendChild(buildPunchRow(selectedEntry.punches[p]));
+      }
+    }
+  }
+
+  function renderLogsView() {
     els.logLoading.hidden = true;
     els.openClearBtn.disabled = state.punches.length === 0;
 
@@ -184,31 +311,33 @@
     els.logList.innerHTML = "";
 
     for (var i = state.punches.length - 1; i >= 0; i--) {
-      var item = state.punches[i];
-      var li = document.createElement("li");
-      li.className = "log-row";
+      els.logList.appendChild(buildPunchRow(state.punches[i]));
+    }
+  }
 
-      var badge = document.createElement("span");
-      badge.className = item.type === "OUT" ? "stamp stamp-out" : "stamp stamp-in";
-      badge.textContent = item.type;
+  function render() {
+    var nowMs = Date.now();
+    els.storageError.hidden = !state.storageFailed;
+    if (state.storageFailed) {
+      els.storageErrorText.textContent =
+        "Saved records could not be read or written in browser storage. Reset local data to clear the error.";
+    }
 
-      var meta = document.createElement("div");
-      meta.className = "log-meta";
+    var rateCheck = Logic.parseRate(state.rawRate);
+    var safeRate = rateCheck.valid ? rateCheck.rate : 0;
+    var summary = Logic.calculateTodaySummary(state.punches, safeRate, nowMs);
 
-      var timeLine = document.createElement("span");
-      timeLine.className = "log-time";
-      timeLine.textContent = formatTimeLabel(item.ms);
+    renderClockView(summary, rateCheck, nowMs);
+    if (state.activeTab === "calendar") {
+      renderCalendarView(safeRate, nowMs);
+    }
+    renderLogsView();
+  }
 
-      var dateLine = document.createElement("span");
-      dateLine.className = "log-date";
-      dateLine.textContent = formatDateLabel(item.ms);
-
-      meta.appendChild(timeLine);
-      meta.appendChild(dateLine);
-      li.appendChild(badge);
-      li.appendChild(meta);
-
-      els.logList.appendChild(li);
+  function openRateModal() {
+    if (els.rateDialog && typeof els.rateDialog.showModal === "function") {
+      els.rateDialog.showModal();
+      els.rateInput.focus();
     }
   }
 
@@ -219,16 +348,19 @@
       render();
     });
 
+    els.rateChip.addEventListener("click", openRateModal);
+    els.cardRateTrigger.addEventListener("click", openRateModal);
+
+    els.closeRateBtn.addEventListener("click", function () {
+      if (els.rateDialog && els.rateDialog.open) {
+        els.rateDialog.close();
+      }
+    });
+
     els.rateInput.addEventListener("input", function (e) {
       state.rawRate = e.target.value;
       saveState();
       render();
-    });
-
-    els.rateInput.addEventListener("focus", function () {
-      if (els.rateInput.scrollIntoView) {
-        els.rateInput.scrollIntoView({ block: "nearest" });
-      }
     });
 
     els.themeToggle.addEventListener("click", function () {
@@ -238,6 +370,43 @@
       try {
         window.localStorage.setItem(THEME_KEY, next);
       } catch (_) {}
+    });
+
+    for (var i = 0; i < els.tabButtons.length; i++) {
+      els.tabButtons[i].addEventListener("click", function (e) {
+        var target = e.currentTarget.getAttribute("data-tab-target");
+        setTab(target);
+      });
+    }
+
+    els.calPrev.addEventListener("click", function () {
+      if (state.calMonth === 0) {
+        state.calMonth = 11;
+        state.calYear -= 1;
+      } else {
+        state.calMonth -= 1;
+      }
+      state.selectedDay = 1;
+      render();
+    });
+
+    els.calNext.addEventListener("click", function () {
+      if (state.calMonth === 11) {
+        state.calMonth = 0;
+        state.calYear += 1;
+      } else {
+        state.calMonth += 1;
+      }
+      state.selectedDay = 1;
+      render();
+    });
+
+    els.calGrid.addEventListener("click", function (e) {
+      var target = e.target;
+      if (target && target.getAttribute && target.getAttribute("data-day")) {
+        state.selectedDay = Number(target.getAttribute("data-day"));
+        render();
+      }
     });
 
     els.resetStorageBtn.addEventListener("click", function () {
@@ -277,15 +446,7 @@
         els.clearDialog.close();
       }
       render();
-      els.punchBtn.focus();
     });
-
-    var isStandalone =
-      window.navigator.standalone === true ||
-      (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-    if (isStandalone && els.iosInstallHelp) {
-      els.iosInstallHelp.open = false;
-    }
   }
 
   function registerServiceWorker() {
@@ -300,6 +461,19 @@
     els.rateInput.value = state.rawRate;
   }
   bindEvents();
-  render();
+  setTab("clock");
+
+  // Update the live wall clock and active shift timer every second on the Clock tab.
+  if (typeof window.setInterval === "function") {
+    window.setInterval(function () {
+      if (state.activeTab === "clock") {
+        var nowMs = Date.now();
+        var rateCheck = Logic.parseRate(state.rawRate);
+        var summary = Logic.calculateTodaySummary(state.punches, rateCheck.valid ? rateCheck.rate : 0, nowMs);
+        renderClockView(summary, rateCheck, nowMs);
+      }
+    }, 1000);
+  }
+
   registerServiceWorker();
 })();

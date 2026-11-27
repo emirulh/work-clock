@@ -1,60 +1,68 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Work Clock">
-  <meta name="theme-color" content="#F6F4EF" id="meta-theme-color">
-  <title>Work Hours and Pay Prototype (Draft)</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="KIRAJAM!">
+  <meta name="theme-color" content="#171717" id="meta-theme-color">
+  <title>KIRAJAM! Work Clock</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <style>
-    /* Design reasons (R-31):
-       Palette: warm paper (#F6F4EF) and dark ink (#18181B) reduce outdoor glare; green (#14532D) and red (#B91C1C) appear only on the punch circle to mark IN vs OUT state.
-       Typography: native iOS system sans for legibility with tabular-nums so timestamps and RM figures align vertically.
-       Layout & spacing: 3 width states (single stack <40rem, 2-column split 40-63.99rem, wide ledger >=64rem) keeping the punch circle as the sole focal point.
-       Cards & radius: 50% circle only on the punch button per spec; 8px panels and 6px controls separate containers from inputs without floating shadows. */
+    /* Design tokens derived from user's KIRAJAM Figma screen (#171717 charcoal, #242424 card, olive #354F1A IN, crimson #B91C1C OUT) plus matching light mode. */
     :root,
+    [data-theme="dark"] {
+      --bg: #171717;
+      --header-bg: #1F1F1F;
+      --surface: #242424;
+      --dock-bg: #2C2C2E;
+      --text: #F5F5F5;
+      --muted: #B8B8C0;
+      --border: #8A8A94;
+      --divider: #323236;
+      --focus: #93C5FD;
+      --in-bg: #354F1A;
+      --in-hover: #3F5F1F;
+      --in-border: #A3E635;
+      --in-dot: #86EFAC;
+      --out-bg: #B91C1C;
+      --out-hover: #991B1B;
+      --out-border: #FCA5A5;
+      --out-dot: #FCA5A5;
+      --punch-fg: #FFFFFF;
+      --tab-active-bg: #F5F5F5;
+      --tab-active-fg: #171717;
+      --err-bg: #2A1215;
+      --err-fg: #FCA5A5;
+      --err-border: #FCA5A5;
+    }
+
     [data-theme="light"] {
       --bg: #F6F4EF;
+      --header-bg: #FFFFFF;
       --surface: #FFFFFF;
+      --dock-bg: #FFFFFF;
       --text: #18181B;
       --muted: #52525B;
       --border: #71717A;
       --divider: #D4D4D8;
       --focus: #1D4ED8;
-      --in-bg: #14532D;
-      --in-hover: #166534;
-      --in-border: #052E16;
+      --in-bg: #354F1A;
+      --in-hover: #2C4215;
+      --in-border: #1E2E0F;
+      --in-dot: #166534;
       --out-bg: #B91C1C;
       --out-hover: #991B1B;
       --out-border: #7F1D1D;
+      --out-dot: #B91C1C;
       --punch-fg: #FFFFFF;
+      --tab-active-bg: #18181B;
+      --tab-active-fg: #FFFFFF;
       --err-bg: #FEF2F2;
       --err-fg: #991B1B;
       --err-border: #B91C1C;
-    }
-
-    [data-theme="dark"] {
-      --bg: #121316;
-      --surface: #1C1E22;
-      --text: #F4F4F5;
-      --muted: #B4B4BC;
-      --border: #8E8E99;
-      --divider: #2E323B;
-      --focus: #93C5FD;
-      --in-bg: #14532D;
-      --in-hover: #166534;
-      --in-border: #86EFAC;
-      --out-bg: #B91C1C;
-      --out-hover: #991B1B;
-      --out-border: #FCA5A5;
-      --punch-fg: #FFFFFF;
-      --err-bg: #2A1215;
-      --err-fg: #FCA5A5;
-      --err-border: #FCA5A5;
     }
 
     *, *::before, *::after {
@@ -63,7 +71,7 @@
 
     html {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      line-height: 1.5;
+      line-height: 1.45;
       background-color: var(--bg);
       color: var(--text);
       -webkit-text-size-adjust: 100%;
@@ -71,156 +79,159 @@
 
     body {
       margin: 0;
-      padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(4rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
       background-color: var(--bg);
       color: var(--text);
+      min-height: 100dvh;
     }
 
     a[href],
     button:not(:disabled),
     summary,
-    select,
-    label[for],
-    input[type="checkbox"],
-    input[type="radio"],
-    [role="button"] {
+    label[for] {
       cursor: pointer;
     }
 
     button:disabled,
-    input:disabled,
     [aria-disabled="true"] {
       cursor: not-allowed;
     }
 
     :focus-visible {
       outline: 3px solid var(--focus);
-      outline-offset: 3px;
+      outline-offset: 2px;
     }
 
-    .app-shell {
-      max-width: 68rem;
+    ::selection {
+      background-color: var(--in-bg);
+      color: var(--punch-fg);
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: var(--header-bg);
+      border-bottom: 1px solid var(--divider);
+      padding: max(0.625rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 0.625rem max(1rem, env(safe-area-inset-left));
+    }
+
+    .header-inner {
+      max-width: 34rem;
       margin: 0 auto;
-    }
-
-    .site-header {
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--divider);
-    }
-
-    .brand-block h1 {
-      margin: 0;
-      font-size: clamp(1.2rem, 2.5vw, 1.5rem);
-      line-height: 1.25;
-    }
-
-    .logo-placeholder {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.875rem;
-      padding: 0.125rem 0.375rem;
-      border: 1.5px solid var(--border);
-      border-radius: 4px;
-      margin-right: 0.375rem;
-    }
-
-    .draft-note {
-      margin: 0.125rem 0 0;
-      font-size: 0.875rem;
-      color: var(--muted);
-    }
-
-    .section-nav {
-      display: flex;
-      flex-wrap: wrap;
       gap: 0.5rem;
-      padding: 0.625rem 0;
-      border-bottom: 1px solid var(--divider);
     }
 
-    .section-nav a {
-      display: inline-flex;
-      align-items: center;
-      min-height: 2.75rem;
-      padding: 0.375rem 0.75rem;
-      color: var(--text);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      border: 1.5px solid transparent;
-      border-radius: 6px;
-      font-size: 0.9375rem;
-      font-weight: 500;
+    .brand-title {
+      margin: 0;
+      font-size: clamp(1.25rem, 4vw, 1.5rem);
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
     }
 
-    .section-nav a:hover {
-      border-color: var(--border);
-      background-color: var(--surface);
-    }
-
-    .section-nav a:active {
-      transform: translateY(1px);
-    }
-
-    .layout-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: 1rem;
-      margin-top: 1rem;
-    }
-
-    .primary-col {
+    .header-actions {
       display: flex;
-      flex-direction: column;
-      gap: 1rem;
+      align-items: center;
+      gap: 0.5rem;
     }
 
-    .panel {
+    .chip-btn {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+      padding: 0.375rem 0.75rem;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
       background-color: var(--surface);
       border: 1.5px solid var(--border);
       border-radius: 8px;
-      padding: 1rem;
     }
 
-    .panel h2 {
-      margin: 0 0 0.5rem;
-      font-size: clamp(1.05rem, 2vw, 1.2rem);
+    .chip-btn:hover:not(:disabled) {
+      border-width: 2px;
     }
 
-    .meta-line {
-      margin: 0;
-      font-size: 0.9375rem;
+    .chip-btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .chip-btn:disabled {
       color: var(--muted);
-      font-variant-numeric: tabular-nums;
+      border-style: dashed;
     }
 
-    .punch-zone {
+    .app-main {
+      max-width: 34rem;
+      margin: 0 auto;
+      padding: 1.25rem max(1rem, env(safe-area-inset-right)) calc(6.5rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+    }
+
+    .error-box {
+      margin: 0 0 1rem;
+      padding: 0.75rem;
+      background-color: var(--err-bg);
+      color: var(--err-fg);
+      border: 2px solid var(--err-border);
+      border-radius: 10px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+
+    .error-actions {
+      margin-top: 0.5rem;
+    }
+
+    /* Home Clock Tab */
+    .clock-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .live-date {
+      margin: 0;
+      font-size: clamp(0.95rem, 3vw, 1.0625rem);
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .live-clock {
+      margin: 0.25rem 0 0;
+      font-size: clamp(1.85rem, 7vw, 2.375rem);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .punch-stage {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 1.25rem 0 0.75rem;
-      gap: 1rem;
+      gap: 0.875rem;
+      margin-bottom: 1.75rem;
     }
 
     .punch-circle {
-      width: 10.5rem;
-      height: 10.5rem;
+      width: 12.5rem;
+      height: 12.5rem;
       border-radius: 50%;
       border: 3px solid var(--in-border);
       background-color: var(--in-bg);
       color: var(--punch-fg);
-      font-size: clamp(2rem, 5vw, 2.375rem);
-      font-weight: 800;
+      font-size: 2.5rem;
+      font-weight: 900;
       letter-spacing: 0.04em;
-      font-variant-numeric: tabular-nums;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
     }
 
     .punch-circle:hover {
@@ -239,93 +250,111 @@
 
     .punch-circle[data-state="out"]:hover {
       background-color: var(--out-hover);
-      border-width: 4px;
     }
 
-    .status-line {
+    .punch-status {
       margin: 0;
-      text-align: center;
       font-size: 0.9375rem;
-      color: var(--text);
+      color: var(--muted);
       font-variant-numeric: tabular-nums;
-      max-width: 30ch;
+      text-align: center;
     }
 
-    .field-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.375rem;
+    /* Figma-inspired Today Status Card (13px radius) */
+    .status-card {
+      background-color: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 13px;
+      padding: 1rem;
     }
 
-    .field-group label {
-      font-weight: 600;
-      font-size: 0.9375rem;
-    }
-
-    .rate-input-wrap {
+    .inout-row {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--divider);
+      font-variant-numeric: tabular-nums;
     }
 
-    .currency-prefix {
+    .inout-item {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .dot {
+      width: 0.625rem;
+      height: 0.625rem;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-in {
+      background-color: var(--in-dot);
+    }
+
+    .dot-out {
+      background-color: var(--out-dot);
+    }
+
+    .inout-label {
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .inout-val {
       font-weight: 700;
-      font-size: 1rem;
       color: var(--text);
     }
 
-    #hourly-rate {
-      width: 100%;
-      min-height: 2.75rem;
-      padding: 0.5rem 0.75rem;
-      font-size: 1rem;
-      font-family: inherit;
-      font-variant-numeric: tabular-nums;
-      color: var(--text);
-      background-color: var(--bg);
-      border: 1.5px solid var(--border);
-      border-radius: 6px;
-      scroll-margin-bottom: 8rem;
+    .timer-block {
+      text-align: center;
+      padding: 0.875rem 0 0.75rem;
     }
 
-    #hourly-rate::placeholder {
-      color: var(--muted);
-      opacity: 1;
-    }
-
-    #hourly-rate:hover {
-      border-width: 2px;
-    }
-
-    .help-line {
+    .timer-label {
       margin: 0;
-      font-size: 0.875rem;
+      font-size: 0.8125rem;
+      font-weight: 600;
       color: var(--muted);
     }
 
-    .equation-box {
-      margin-top: 1rem;
-      padding: 0.875rem;
-      background-color: var(--bg);
-      border: 1.5px solid var(--border);
-      border-radius: 6px;
+    .timer-value {
+      margin: 0.125rem 0 0;
+      font-size: clamp(1.75rem, 6vw, 2.125rem);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    .pay-strip {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid var(--divider);
       font-variant-numeric: tabular-nums;
     }
 
-    .equation-formula {
+    .pay-earned {
       margin: 0;
-      font-size: clamp(1.05rem, 2.4vw, 1.25rem);
-      line-height: 1.4;
-      word-break: break-word;
+      font-size: 1.0625rem;
+      font-weight: 800;
     }
 
-    .equation-caption {
-      margin: 0.375rem 0 0;
-      font-size: 0.875rem;
+    .pay-formula {
+      margin: 0.125rem 0 0;
+      font-size: 0.8125rem;
       color: var(--muted);
     }
 
-    .log-header {
+    /* Calendar Tab */
+    .view-head {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -334,60 +363,91 @@
       margin-bottom: 0.75rem;
     }
 
-    .log-header h2 {
+    .view-head h2 {
       margin: 0;
+      font-size: 1.25rem;
     }
 
-    .secondary-btn {
-      min-height: 2.75rem;
-      min-width: 2.75rem;
-      padding: 0.5rem 0.875rem;
+    .cal-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .cal-summary {
+      margin: 0 0 0.75rem;
       font-size: 0.9375rem;
-      font-family: inherit;
-      font-weight: 600;
+      font-weight: 700;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.25rem;
+      margin-bottom: 0.25rem;
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .cal-cell {
+      min-height: 2.75rem;
+      padding: 0;
+      border: 1.5px solid var(--divider);
+      border-radius: 8px;
+      background-color: var(--surface);
       color: var(--text);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      position: relative;
+    }
+
+    .cal-cell[data-has-work="true"] {
+      border-color: var(--in-border);
+      font-weight: 800;
+    }
+
+    .cal-cell[data-selected="true"] {
+      background-color: var(--tab-active-bg);
+      color: var(--tab-active-fg);
+      border-color: var(--tab-active-bg);
+    }
+
+    .cal-day-box {
       background-color: var(--surface);
       border: 1.5px solid var(--border);
-      border-radius: 6px;
+      border-radius: 13px;
+      padding: 1rem;
     }
 
-    .secondary-btn:hover:not(:disabled) {
-      background-color: var(--bg);
-      border-width: 2px;
+    .cal-day-title {
+      margin: 0 0 0.75rem;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
 
-    .secondary-btn:active:not(:disabled) {
-      transform: translateY(1px);
-    }
-
-    .secondary-btn:disabled {
-      color: var(--muted);
-      border-style: dashed;
-    }
-
+    /* Logs Tab */
     .state-box {
       margin: 0;
       padding: 1rem;
-      background-color: var(--bg);
+      background-color: var(--surface);
       border: 1.5px dashed var(--border);
-      border-radius: 6px;
+      border-radius: 10px;
       font-size: 0.9375rem;
       color: var(--text);
-    }
-
-    .error-box {
-      margin: 0.75rem 0;
-      padding: 0.75rem;
-      background-color: var(--err-bg);
-      color: var(--err-fg);
-      border: 2px solid var(--err-border);
-      border-radius: 6px;
-      font-size: 0.9375rem;
-      font-weight: 600;
-    }
-
-    .error-actions {
-      margin-top: 0.5rem;
     }
 
     .log-list {
@@ -404,23 +464,29 @@
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 0.5rem 0.75rem;
+      gap: 0.5rem;
       padding: 0.625rem 0.75rem;
-      background-color: var(--bg);
+      background-color: var(--surface);
       border: 1.5px solid var(--border);
-      border-radius: 6px;
+      border-radius: 10px;
       font-variant-numeric: tabular-nums;
+    }
+
+    .log-left {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
     }
 
     .stamp {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 3.25rem;
-      padding: 0.1875rem 0.5rem;
-      border-radius: 4px;
+      min-width: 3rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
       font-weight: 800;
-      font-size: 0.875rem;
       color: var(--punch-fg);
     }
 
@@ -434,13 +500,6 @@
       border: 1.5px solid var(--out-border);
     }
 
-    .log-meta {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: 0.25rem 0.75rem;
-    }
-
     .log-time {
       font-weight: 700;
       font-size: 0.9375rem;
@@ -451,18 +510,80 @@
       color: var(--muted);
     }
 
+    /* Floating Pill Bottom Dock (matches Figma Container) */
+    .bottom-nav-wrap {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
+      padding: 0.5rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+      pointer-events: none;
+    }
+
+    .bottom-dock {
+      pointer-events: auto;
+      max-width: 24rem;
+      margin: 0 auto;
+      background-color: var(--dock-bg);
+      border: 1.5px solid var(--border);
+      border-radius: 9999px;
+      padding: 0.375rem;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.375rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+    }
+
+    .dock-tab {
+      min-height: 3rem;
+      padding: 0.25rem 0.5rem;
+      border: none;
+      border-radius: 9999px;
+      background-color: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 700;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.125rem;
+    }
+
+    .dock-tab:hover {
+      background-color: var(--surface);
+    }
+
+    .dock-tab[data-active="true"] {
+      background-color: var(--tab-active-bg);
+      color: var(--tab-active-fg);
+    }
+
+    .dock-tab svg {
+      width: 22px;
+      height: 22px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Dialogs */
     dialog {
       max-width: 24rem;
       width: calc(100% - 2rem);
       background-color: var(--surface);
       color: var(--text);
       border: 2px solid var(--border);
-      border-radius: 8px;
+      border-radius: 13px;
       padding: 1.25rem;
     }
 
     dialog::backdrop {
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(0, 0, 0, 0.65);
     }
 
     dialog h2 {
@@ -471,15 +592,48 @@
     }
 
     dialog p {
-      margin: 0 0 1rem;
+      margin: 0 0 0.875rem;
       font-size: 0.9375rem;
+      color: var(--muted);
+    }
+
+    .field-label {
+      display: block;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      margin-bottom: 0.375rem;
+    }
+
+    .rate-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    #hourly-rate {
+      width: 100%;
+      min-height: 2.75rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      background-color: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+    }
+
+    #hourly-rate::placeholder {
+      color: var(--muted);
+      opacity: 1;
     }
 
     .dialog-actions {
       display: flex;
-      flex-wrap: wrap;
       justify-content: flex-end;
       gap: 0.75rem;
+      margin-top: 1rem;
     }
 
     .danger-btn {
@@ -490,86 +644,33 @@
 
     .danger-btn:hover:not(:disabled) {
       background-color: var(--out-hover);
-      color: var(--punch-fg);
     }
 
-    .site-footer {
-      margin-top: 1.5rem;
-      padding-top: 1rem;
+    .install-tip {
+      margin-top: 1rem;
+      padding-top: 0.75rem;
       border-top: 1px solid var(--divider);
-    }
-
-    .install-details summary {
-      display: inline-flex;
-      align-items: center;
-      min-height: 2.75rem;
-      padding: 0.375rem 0.75rem;
-      font-weight: 600;
-      border: 1.5px solid var(--border);
-      border-radius: 6px;
-      background-color: var(--surface);
-    }
-
-    .install-details summary:hover {
-      border-width: 2px;
-    }
-
-    .install-steps {
-      margin: 0.75rem 0 0;
-      padding-left: 1.25rem;
-      font-size: 0.9375rem;
-    }
-
-    .install-steps li + li {
-      margin-top: 0.25rem;
-    }
-
-    .footer-meta {
-      margin: 0.75rem 0 0;
-      font-size: 0.875rem;
+      font-size: 0.8125rem;
       color: var(--muted);
     }
 
-    /* Tablet / narrow laptop layout state */
+    /* Tablet & Desktop breakpoints */
     @media (min-width: 40rem) {
-      body {
-        padding: 1.5rem;
-      }
-
-      .layout-grid {
-        grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
-        gap: 1.25rem;
-        align-items: start;
-      }
-
-      .panel {
-        padding: 1.25rem;
+      .header-inner,
+      .app-main {
+        max-width: 44rem;
       }
 
       .punch-circle {
-        width: 11.5rem;
-        height: 11.5rem;
+        width: 13.5rem;
+        height: 13.5rem;
       }
     }
 
-    /* Desktop wide layout state */
     @media (min-width: 64rem) {
-      body {
-        padding: 2rem;
-      }
-
-      .layout-grid {
-        grid-template-columns: 24rem minmax(0, 1fr);
-        gap: 1.75rem;
-      }
-
-      .panel {
-        padding: 1.5rem;
-      }
-
-      .punch-circle {
-        width: 12rem;
-        height: 12rem;
+      .header-inner,
+      .app-main {
+        max-width: 52rem;
       }
     }
 
@@ -577,7 +678,6 @@
       *, *::before, *::after {
         transition: none !important;
         animation: none !important;
-        scroll-behavior: auto !important;
       }
     }
   </style>
@@ -585,121 +685,137 @@
   <script src="./app.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="site-header">
-      <div class="brand-block">
-        <h1><span class="logo-placeholder">[LOGO]</span>Work Clock</h1>
-        <p class="draft-note">Draft without direction (iOS Home Screen prototype)</p>
+  <header class="app-header">
+    <div class="header-inner">
+      <h1 class="brand-title">KIRAJAM!</h1>
+      <div class="header-actions">
+        <button type="button" id="rate-chip" class="chip-btn" aria-label="Edit hourly rate">RM 0.00/hr</button>
+        <button type="button" id="theme-toggle" class="chip-btn" aria-pressed="true" aria-label="Switch to light theme">Light</button>
       </div>
-      <button type="button" id="theme-toggle" class="secondary-btn" aria-pressed="false">
-        Switch to dark theme
-      </button>
-    </header>
+    </div>
+  </header>
 
-    <nav class="section-nav" aria-label="App sections">
-      <a href="#punch-section">Punch clock</a>
-      <a href="#pay-section">Today's pay</a>
-      <a href="#log-section">Recorded log</a>
-    </nav>
+  <main class="app-main" id="main-content">
+    <div id="storage-error" class="error-box" role="alert" hidden>
+      <span id="storage-error-text"></span>
+      <div class="error-actions">
+        <button type="button" id="reset-storage-btn" class="chip-btn">Reset local data</button>
+      </div>
+    </div>
 
-    <main id="main-content">
-      <div id="storage-error" class="error-box" role="alert" hidden>
-        <span id="storage-error-text"></span>
-        <div class="error-actions">
-          <button type="button" id="reset-storage-btn" class="secondary-btn">Reset local data</button>
+    <!-- Tab 1: Calendar -->
+    <section id="view-calendar" role="tabpanel" aria-labelledby="tab-calendar" hidden>
+      <div class="view-head">
+        <h2 id="cal-month-label">Month</h2>
+        <div class="cal-controls">
+          <button type="button" id="cal-prev" class="chip-btn" aria-label="Previous month">Prev</button>
+          <button type="button" id="cal-next" class="chip-btn" aria-label="Next month">Next</button>
         </div>
       </div>
+      <p id="cal-month-summary" class="cal-summary">0.00 hrs total | RM 0.00</p>
+      <div class="cal-weekdays" aria-hidden="true">
+        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+      </div>
+      <div id="cal-grid" class="cal-grid" role="group" aria-label="Month days"></div>
+      <div class="cal-day-box">
+        <p id="cal-day-title" class="cal-day-title">Selected day</p>
+        <p id="cal-day-empty" class="state-box">No shifts recorded on this date.</p>
+        <ol id="cal-day-list" class="log-list" hidden></ol>
+      </div>
+    </section>
 
-      <div class="layout-grid">
-        <div class="primary-col">
-          <section id="punch-section" class="panel" aria-labelledby="punch-heading">
-            <h2 id="punch-heading">Shift punch</h2>
-            <p id="today-date" class="meta-line">Today</p>
-            <div class="punch-zone">
-              <button
-                type="button"
-                id="punch-btn"
-                class="punch-circle"
-                data-state="in"
-                aria-describedby="punch-status"
-              >IN</button>
-              <p id="punch-status" class="status-line" role="status" aria-live="polite">
-                Currently clocked out. Tap IN to start recording work time.
-              </p>
-            </div>
-          </section>
+    <!-- Tab 2: Clock (Home) -->
+    <section id="view-clock" role="tabpanel" aria-labelledby="tab-clock">
+      <div class="clock-header">
+        <p id="live-date" class="live-date">Today</p>
+        <p id="live-clock" class="live-clock" aria-live="off">00:00:00</p>
+      </div>
 
-          <section id="pay-section" class="panel" aria-labelledby="pay-heading">
-            <h2 id="pay-heading">Hourly rate and today's pay</h2>
-            <div class="field-group">
-              <label for="hourly-rate">Hourly rate (RM)</label>
-              <div class="rate-input-wrap">
-                <span class="currency-prefix" aria-hidden="true">RM</span>
-                <input
-                  id="hourly-rate"
-                  name="hourly-rate"
-                  type="number"
-                  inputmode="decimal"
-                  min="0"
-                  max="100000"
-                  step="0.01"
-                  placeholder="0.00"
-                  aria-describedby="rate-help rate-error"
-                >
-              </div>
-              <p id="rate-help" class="help-line">
-                Enter your hourly pay rate to calculate today's earnings from IN and OUT records.
-              </p>
-              <p id="rate-error" class="error-box" role="alert" hidden></p>
-            </div>
+      <div class="punch-stage">
+        <button type="button" id="punch-btn" class="punch-circle" data-state="in" aria-describedby="punch-status">IN</button>
+        <p id="punch-status" class="punch-status" role="status" aria-live="polite">Tap IN when your shift starts</p>
+      </div>
 
-            <div class="equation-box" aria-live="polite">
-              <p class="equation-formula">
-                (<span id="eq-rate">RM 0.00</span>) &times; (<span id="eq-hours">0.00 hrs</span>) = <strong id="eq-total">RM 0.00</strong>
-              </p>
-              <p id="eq-duration" class="equation-caption">Completed time today: 0h 0m 0s</p>
-            </div>
-          </section>
-        </div>
-
-        <section id="log-section" class="panel" aria-labelledby="log-heading">
-          <div class="log-header">
-            <h2 id="log-heading">Recorded IN and OUT log</h2>
-            <button type="button" id="open-clear-btn" class="secondary-btn" disabled>
-              Clear log
-            </button>
+      <div class="status-card" aria-live="polite">
+        <div class="inout-row">
+          <div class="inout-item">
+            <span class="dot dot-in" aria-hidden="true"></span>
+            <span class="inout-label">IN</span>
+            <span id="card-in-time" class="inout-val">Not yet</span>
           </div>
-          <p id="log-loading" class="state-box" role="status">
-            Loading saved punch records from device storage...
-          </p>
-          <p id="log-empty" class="state-box" hidden>
-            No IN or OUT records yet. Tap the circle IN button to record your first date and time.
-          </p>
-          <ol id="log-list" class="log-list" hidden></ol>
-        </section>
-      </div>
-
-      <dialog id="clear-dialog" aria-labelledby="clear-dialog-title">
-        <h2 id="clear-dialog-title">Clear recorded punches?</h2>
-        <p>This deletes every saved IN and OUT timestamp on this device. Your hourly rate stays saved.</p>
-        <div class="dialog-actions">
-          <button type="button" id="cancel-clear-btn" class="secondary-btn">Cancel</button>
-          <button type="button" id="confirm-clear-btn" class="secondary-btn danger-btn">Confirm clear</button>
+          <div class="inout-item">
+            <span class="dot dot-out" aria-hidden="true"></span>
+            <span class="inout-label">OUT</span>
+            <span id="card-out-time" class="inout-val">Not yet</span>
+          </div>
         </div>
-      </dialog>
-    </main>
 
-    <footer class="site-footer">
-      <details id="ios-install-help" class="install-details" open>
-        <summary>Install on iPhone Home Screen</summary>
-        <ol class="install-steps">
-          <li>Open this app URL in Safari on your iPhone.</li>
-          <li>Tap the Share icon in the Safari toolbar.</li>
-          <li>Choose Add to Home Screen, then tap Add in the top corner.</li>
-        </ol>
-      </details>
-      <p class="footer-meta">Records stay in local browser storage on your device. Placeholder [LOGO] awaits brand icon.</p>
-    </footer>
-  </div>
+        <div class="timer-block">
+          <p class="timer-label">Working time today</p>
+          <p id="card-timer" class="timer-value">00:00:00</p>
+        </div>
+
+        <div class="pay-strip">
+          <div>
+            <p id="card-earned" class="pay-earned">RM 0.00 today</p>
+            <p id="card-formula" class="pay-formula">(RM 0.00) x (0.00 hrs) = RM 0.00</p>
+          </div>
+          <button type="button" id="card-rate-trigger" class="chip-btn">Set rate</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Logs -->
+    <section id="view-logs" role="tabpanel" aria-labelledby="tab-logs" hidden>
+      <div class="view-head">
+        <h2>Punch logs</h2>
+        <button type="button" id="open-clear-btn" class="chip-btn" disabled>Clear log</button>
+      </div>
+      <p id="log-loading" class="state-box" role="status">Loading saved punch records from device storage...</p>
+      <p id="log-empty" class="state-box" hidden>No IN or OUT records yet. Switch to Clock and tap IN to record your first shift.</p>
+      <ol id="log-list" class="log-list" hidden></ol>
+    </section>
+  </main>
+
+  <footer class="bottom-nav-wrap">
+    <nav class="bottom-dock" role="tablist" aria-label="Main views">
+      <button type="button" id="tab-calendar" class="dock-tab" role="tab" data-tab-target="calendar" aria-controls="view-calendar" aria-selected="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendar</span>
+      </button>
+      <button type="button" id="tab-clock" class="dock-tab" role="tab" data-tab-target="clock" aria-controls="view-clock" aria-selected="true" data-active="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+        <span>Clock</span>
+      </button>
+      <button type="button" id="tab-logs" class="dock-tab" role="tab" data-tab-target="logs" aria-controls="view-logs" aria-selected="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+        <span>Logs</span>
+      </button>
+    </nav>
+  </footer>
+
+  <dialog id="rate-dialog" aria-labelledby="rate-dialog-title">
+    <h2 id="rate-dialog-title">Hourly rate (RM)</h2>
+    <p>Multiplies your hourly pay rate by your recorded IN and OUT hours.</p>
+    <label for="hourly-rate" class="field-label">Rate per hour</label>
+    <div class="rate-input-row">
+      <span aria-hidden="true">RM</span>
+      <input id="hourly-rate" name="hourly-rate" type="number" inputmode="decimal" min="0" max="100000" step="0.01" placeholder="0.00" aria-describedby="rate-error">
+    </div>
+    <p id="rate-error" class="error-box" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="close-rate-btn" class="chip-btn">Done</button>
+    </div>
+    <p class="install-tip">iPhone Home Screen: open in Safari, tap Share, then choose Add to Home Screen.</p>
+  </dialog>
+
+  <dialog id="clear-dialog" aria-labelledby="clear-dialog-title">
+    <h2 id="clear-dialog-title">Clear all punch logs?</h2>
+    <p>Deletes every saved IN and OUT timestamp on this device. Your hourly rate stays saved.</p>
+    <div class="dialog-actions">
+      <button type="button" id="cancel-clear-btn" class="chip-btn">Cancel</button>
+      <button type="button" id="confirm-clear-btn" class="chip-btn danger-btn">Confirm clear</button>
+    </div>
+  </dialog>
 </body>
 </html>

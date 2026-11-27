@@ -1,9 +1,9 @@
 {
-  "name": "Work Clock Prototype",
-  "short_name": "Work Clock",
-  "description": "Punch IN and OUT with date and time logging and RM hourly pay calculation.",
+  "name": "KIRAJAM!",
+  "short_name": "KIRAJAM!",
+  "description": "One-tap IN and OUT shift punch clock with live timer and RM hourly pay calculator.",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#F6F4EF",
-  "theme_color": "#F6F4EF"
+  "background_color": "#171717",
+  "theme_color": "#171717"
 }
