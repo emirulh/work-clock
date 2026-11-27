@@ -38,6 +38,16 @@
     calDayTitle: document.getElementById("cal-day-title"),
     calDayEmpty: document.getElementById("cal-day-empty"),
     calDayList: document.getElementById("cal-day-list"),
+    toggleManualBtn: document.getElementById("toggle-manual-btn"),
+    manualDrawer: document.getElementById("manual-drawer"),
+    manualIn: document.getElementById("manual-in"),
+    manualOut: document.getElementById("manual-out"),
+    manualRest: document.getElementById("manual-rest"),
+    restChips: Array.prototype.slice.call(document.querySelectorAll("[data-rest-mins]")),
+    manualPreview: document.getElementById("manual-preview"),
+    manualError: document.getElementById("manual-error"),
+    cancelManualBtn: document.getElementById("cancel-manual-btn"),
+    saveManualBtn: document.getElementById("save-manual-btn"),
     logLoading: document.getElementById("log-loading"),
     logEmpty: document.getElementById("log-empty"),
     logList: document.getElementById("log-list"),
@@ -59,7 +69,8 @@
     activeTab: "clock",
     calYear: nowInit.getFullYear(),
     calMonth: nowInit.getMonth(),
-    selectedDay: nowInit.getDate()
+    selectedDay: nowInit.getDate(),
+    manualOpen: false
   };
 
   function formatDateShort(ms) {
@@ -99,7 +110,7 @@
     var active = theme === "light" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", active);
     if (els.metaThemeColor) {
-      els.metaThemeColor.setAttribute("content", active === "light" ? "#F6F4EF" : "#171717");
+      els.metaThemeColor.setAttribute("content", active === "light" ? "#F6F4EF" : "#111214");
     }
     if (els.themeToggle) {
       var isDark = active === "dark";
@@ -116,7 +127,6 @@
     } catch (_) {
       saved = null;
     }
-    // Default to dark theme to match the KIRAJAM Figma design unless user toggled light.
     applyTheme(saved === "light" ? "light" : "dark");
   }
 
@@ -173,7 +183,40 @@
     render();
   }
 
-  function buildPunchRow(item) {
+  function setManualDrawerOpen(isOpen) {
+    state.manualOpen = Boolean(isOpen);
+    els.manualDrawer.setAttribute("data-open", state.manualOpen ? "true" : "false");
+    els.toggleManualBtn.setAttribute("aria-expanded", state.manualOpen ? "true" : "false");
+    els.toggleManualBtn.textContent = state.manualOpen ? "Close editor" : "Add shift";
+    if (state.manualOpen) {
+      updateManualPreview();
+    }
+  }
+
+  function updateManualPreview() {
+    var rateCheck = Logic.parseRate(state.rawRate);
+    var safeRate = rateCheck.valid ? rateCheck.rate : 0;
+    var preview = Logic.previewManualShift(
+      els.manualIn.value,
+      els.manualOut.value,
+      els.manualRest.value,
+      safeRate
+    );
+    if (!preview.valid) {
+      els.manualError.hidden = false;
+      els.manualError.textContent = preview.error;
+      els.manualPreview.textContent = "Net: 0.00 hrs | RM 0.00";
+      els.saveManualBtn.disabled = true;
+    } else {
+      els.manualError.hidden = true;
+      els.manualError.textContent = "";
+      els.manualPreview.textContent =
+        "Net: " + preview.hoursText + " hrs (" + preview.netHms + ") | " + preview.earnedText;
+      els.saveManualBtn.disabled = false;
+    }
+  }
+
+  function buildPunchRow(item, allowDelete) {
     var li = document.createElement("li");
     li.className = "log-row";
 
@@ -191,12 +234,33 @@
     left.appendChild(stamp);
     left.appendChild(timeLine);
 
+    if (item.restMs && item.restMs > 0) {
+      var restTag = document.createElement("span");
+      restTag.className = "rest-tag";
+      restTag.textContent = "Rest " + String(Math.round(item.restMs / 60000)) + "m";
+      left.appendChild(restTag);
+    }
+
+    var right = document.createElement("div");
+    right.className = "log-right";
+
     var dateLine = document.createElement("span");
     dateLine.className = "log-date";
     dateLine.textContent = formatDateShort(item.ms);
+    right.appendChild(dateLine);
+
+    if (allowDelete && item.pairId && item.type === "OUT") {
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "mini-delete-btn";
+      delBtn.textContent = "Delete";
+      delBtn.setAttribute("data-delete-pair", item.pairId);
+      delBtn.setAttribute("aria-label", "Delete manual shift");
+      right.appendChild(delBtn);
+    }
 
     li.appendChild(left);
-    li.appendChild(dateLine);
+    li.appendChild(right);
     return li;
   }
 
@@ -290,8 +354,12 @@
       els.calDayEmpty.hidden = true;
       els.calDayList.hidden = false;
       for (var p = 0; p < selectedEntry.punches.length; p++) {
-        els.calDayList.appendChild(buildPunchRow(selectedEntry.punches[p]));
+        els.calDayList.appendChild(buildPunchRow(selectedEntry.punches[p], true));
       }
+    }
+
+    if (state.manualOpen) {
+      updateManualPreview();
     }
   }
 
@@ -311,7 +379,7 @@
     els.logList.innerHTML = "";
 
     for (var i = state.punches.length - 1; i >= 0; i--) {
-      els.logList.appendChild(buildPunchRow(state.punches[i]));
+      els.logList.appendChild(buildPunchRow(state.punches[i], false));
     }
   }
 
@@ -409,6 +477,56 @@
       }
     });
 
+    els.toggleManualBtn.addEventListener("click", function () {
+      setManualDrawerOpen(!state.manualOpen);
+    });
+
+    els.cancelManualBtn.addEventListener("click", function () {
+      setManualDrawerOpen(false);
+    });
+
+    els.manualIn.addEventListener("input", updateManualPreview);
+    els.manualOut.addEventListener("input", updateManualPreview);
+    els.manualRest.addEventListener("input", updateManualPreview);
+
+    for (var r = 0; r < els.restChips.length; r++) {
+      els.restChips[r].addEventListener("click", function (e) {
+        els.manualRest.value = e.currentTarget.getAttribute("data-rest-mins");
+        updateManualPreview();
+      });
+    }
+
+    els.saveManualBtn.addEventListener("click", function () {
+      var result = Logic.addManualShift(
+        state.punches,
+        state.calYear,
+        state.calMonth,
+        state.selectedDay,
+        els.manualIn.value,
+        els.manualOut.value,
+        els.manualRest.value
+      );
+      if (!result.valid) {
+        els.manualError.hidden = false;
+        els.manualError.textContent = result.error;
+        return;
+      }
+      state.punches = result.punches;
+      saveState();
+      setManualDrawerOpen(false);
+      render();
+    });
+
+    els.calDayList.addEventListener("click", function (e) {
+      var target = e.target;
+      if (target && target.getAttribute && target.getAttribute("data-delete-pair")) {
+        var pairId = target.getAttribute("data-delete-pair");
+        state.punches = Logic.deleteShiftByPairId(state.punches, pairId);
+        saveState();
+        render();
+      }
+    });
+
     els.resetStorageBtn.addEventListener("click", function () {
       state.punches = [];
       state.rawRate = "";
@@ -463,7 +581,6 @@
   bindEvents();
   setTab("clock");
 
-  // Update the live wall clock and active shift timer every second on the Clock tab.
   if (typeof window.setInterval === "function") {
     window.setInterval(function () {
       if (state.activeTab === "clock") {

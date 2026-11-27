@@ -1,6 +1,6 @@
 "use strict";
 
-var CACHE_NAME = "kirajam-v3";
+var CACHE_NAME = "kirajam-v4";
 var ASSETS = [
   "./",
   "./index.html",
@@ -35,13 +35,22 @@ self.addEventListener("activate", function (event) {
   self.clients.claim();
 });
 
+// Network-first so iPhone Home Screen pulls updates immediately when online, with offline cache fallback.
 self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") {
     return;
   }
   event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      return cached || fetch(event.request);
-    })
+    fetch(event.request)
+      .then(function (res) {
+        var copy = res.clone();
+        caches.open(CACHE_NAME).then(function (cache) {
+          cache.put(event.request, copy);
+        });
+        return res;
+      })
+      .catch(function () {
+        return caches.match(event.request);
+      })
   );
 });
