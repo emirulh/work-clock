@@ -1,6 +1,6 @@
 "use strict";
 
-var CACHE_NAME = "kirajam-v4";
+var CACHE_NAME = "kirajam-v5";
 var ASSETS = [
   "./",
   "./index.html",
