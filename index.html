@@ -169,11 +169,11 @@
     .app-main {
       max-width: 34rem;
       margin: 0 auto;
-      padding: 1.25rem max(1rem, env(safe-area-inset-right)) calc(6.5rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+      padding: 0.75rem max(1rem, env(safe-area-inset-right)) calc(5.75rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
     }
 
     .error-box {
-      margin: 0 0 1rem;
+      margin: 0 0 0.75rem;
       padding: 0.75rem;
       background-color: var(--err-bg);
       color: var(--err-fg);
@@ -190,19 +190,19 @@
     /* Home Clock Tab */
     .clock-header {
       text-align: center;
-      margin-bottom: 1.5rem;
+      margin-bottom: 0.875rem;
     }
 
     .live-date {
       margin: 0;
-      font-size: clamp(0.95rem, 3vw, 1.0625rem);
+      font-size: clamp(0.9rem, 3vw, 1rem);
       font-weight: 600;
       color: var(--muted);
     }
 
     .live-clock {
-      margin: 0.25rem 0 0;
-      font-size: clamp(1.85rem, 7vw, 2.375rem);
+      margin: 0.125rem 0 0;
+      font-size: clamp(1.65rem, 6.5vw, 2.125rem);
       font-weight: 800;
       font-variant-numeric: tabular-nums;
       letter-spacing: -0.02em;
@@ -212,18 +212,18 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.875rem;
-      margin-bottom: 1.75rem;
+      gap: 0.625rem;
+      margin-bottom: 1rem;
     }
 
     .punch-circle {
-      width: 12.5rem;
-      height: 12.5rem;
+      width: clamp(10.5rem, 24dvh, 12.25rem);
+      height: clamp(10.5rem, 24dvh, 12.25rem);
       border-radius: 50%;
       border: 3px solid var(--in-border);
       background-color: var(--in-bg);
       color: var(--punch-fg);
-      font-size: 2.5rem;
+      font-size: clamp(2rem, 5vw, 2.375rem);
       font-weight: 900;
       letter-spacing: 0.04em;
       display: inline-flex;
@@ -312,7 +312,7 @@
 
     .timer-block {
       text-align: center;
-      padding: 0.875rem 0 0.75rem;
+      padding: 0.5rem 0 0.5rem;
     }
 
     .timer-label {
@@ -324,7 +324,7 @@
 
     .timer-value {
       margin: 0.125rem 0 0;
-      font-size: clamp(1.75rem, 6vw, 2.125rem);
+      font-size: clamp(1.6rem, 5.5vw, 2rem);
       font-weight: 800;
       font-variant-numeric: tabular-nums;
       letter-spacing: 0.02em;
