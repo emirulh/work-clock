@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Work Clock">
+  <meta name="theme-color" content="#F6F4EF" id="meta-theme-color">
+  <title>Work Hours and Pay Prototype (Draft)</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <style>
+    /* Design reasons (R-31):
+       Palette: warm paper (#F6F4EF) and dark ink (#18181B) reduce outdoor glare; green (#14532D) and red (#B91C1C) appear only on the punch circle to mark IN vs OUT state.
+       Typography: native iOS system sans for legibility with tabular-nums so timestamps and RM figures align vertically.
+       Layout & spacing: 3 width states (single stack <40rem, 2-column split 40-63.99rem, wide ledger >=64rem) keeping the punch circle as the sole focal point.
+       Cards & radius: 50% circle only on the punch button per spec; 8px panels and 6px controls separate containers from inputs without floating shadows. */
+    :root,
+    [data-theme="light"] {
+      --bg: #F6F4EF;
+      --surface: #FFFFFF;
+      --text: #18181B;
+      --muted: #52525B;
+      --border: #71717A;
+      --divider: #D4D4D8;
+      --focus: #1D4ED8;
+      --in-bg: #14532D;
+      --in-hover: #166534;
+      --in-border: #052E16;
+      --out-bg: #B91C1C;
+      --out-hover: #991B1B;
+      --out-border: #7F1D1D;
+      --punch-fg: #FFFFFF;
+      --err-bg: #FEF2F2;
+      --err-fg: #991B1B;
+      --err-border: #B91C1C;
+    }
+
+    [data-theme="dark"] {
+      --bg: #121316;
+      --surface: #1C1E22;
+      --text: #F4F4F5;
+      --muted: #B4B4BC;
+      --border: #8E8E99;
+      --divider: #2E323B;
+      --focus: #93C5FD;
+      --in-bg: #14532D;
+      --in-hover: #166534;
+      --in-border: #86EFAC;
+      --out-bg: #B91C1C;
+      --out-hover: #991B1B;
+      --out-border: #FCA5A5;
+      --punch-fg: #FFFFFF;
+      --err-bg: #2A1215;
+      --err-fg: #FCA5A5;
+      --err-border: #FCA5A5;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      background-color: var(--bg);
+      color: var(--text);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(4rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    a[href],
+    button:not(:disabled),
+    summary,
+    select,
+    label[for],
+    input[type="checkbox"],
+    input[type="radio"],
+    [role="button"] {
+      cursor: pointer;
+    }
+
+    button:disabled,
+    input:disabled,
+    [aria-disabled="true"] {
+      cursor: not-allowed;
+    }
+
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .app-shell {
+      max-width: 68rem;
+      margin: 0 auto;
+    }
+
+    .site-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .brand-block h1 {
+      margin: 0;
+      font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+      line-height: 1.25;
+    }
+
+    .logo-placeholder {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.875rem;
+      padding: 0.125rem 0.375rem;
+      border: 1.5px solid var(--border);
+      border-radius: 4px;
+      margin-right: 0.375rem;
+    }
+
+    .draft-note {
+      margin: 0.125rem 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .section-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.625rem 0;
+      border-bottom: 1px solid var(--divider);
+    }
+
+    .section-nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+      padding: 0.375rem 0.75rem;
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      border: 1.5px solid transparent;
+      border-radius: 6px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+    }
+
+    .section-nav a:hover {
+      border-color: var(--border);
+      background-color: var(--surface);
+    }
+
+    .section-nav a:active {
+      transform: translateY(1px);
+    }
+
+    .layout-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .primary-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .panel {
+      background-color: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .panel h2 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(1.05rem, 2vw, 1.2rem);
+    }
+
+    .meta-line {
+      margin: 0;
+      font-size: 0.9375rem;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .punch-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.25rem 0 0.75rem;
+      gap: 1rem;
+    }
+
+    .punch-circle {
+      width: 10.5rem;
+      height: 10.5rem;
+      border-radius: 50%;
+      border: 3px solid var(--in-border);
+      background-color: var(--in-bg);
+      color: var(--punch-fg);
+      font-size: clamp(2rem, 5vw, 2.375rem);
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .punch-circle:hover {
+      background-color: var(--in-hover);
+      border-width: 4px;
+    }
+
+    .punch-circle:active {
+      transform: translateY(2px) scale(0.98);
+    }
+
+    .punch-circle[data-state="out"] {
+      background-color: var(--out-bg);
+      border-color: var(--out-border);
+    }
+
+    .punch-circle[data-state="out"]:hover {
+      background-color: var(--out-hover);
+      border-width: 4px;
+    }
+
+    .status-line {
+      margin: 0;
+      text-align: center;
+      font-size: 0.9375rem;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      max-width: 30ch;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+
+    .field-group label {
+      font-weight: 600;
+      font-size: 0.9375rem;
+    }
+
+    .rate-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .currency-prefix {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    #hourly-rate {
+      width: 100%;
+      min-height: 2.75rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      background-color: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      scroll-margin-bottom: 8rem;
+    }
+
+    #hourly-rate::placeholder {
+      color: var(--muted);
+      opacity: 1;
+    }
+
+    #hourly-rate:hover {
+      border-width: 2px;
+    }
+
+    .help-line {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .equation-box {
+      margin-top: 1rem;
+      padding: 0.875rem;
+      background-color: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .equation-formula {
+      margin: 0;
+      font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .equation-caption {
+      margin: 0.375rem 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .log-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .log-header h2 {
+      margin: 0;
+    }
+
+    .secondary-btn {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+      padding: 0.5rem 0.875rem;
+      font-size: 0.9375rem;
+      font-family: inherit;
+      font-weight: 600;
+      color: var(--text);
+      background-color: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .secondary-btn:hover:not(:disabled) {
+      background-color: var(--bg);
+      border-width: 2px;
+    }
+
+    .secondary-btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .secondary-btn:disabled {
+      color: var(--muted);
+      border-style: dashed;
+    }
+
+    .state-box {
+      margin: 0;
+      padding: 1rem;
+      background-color: var(--bg);
+      border: 1.5px dashed var(--border);
+      border-radius: 6px;
+      font-size: 0.9375rem;
+      color: var(--text);
+    }
+
+    .error-box {
+      margin: 0.75rem 0;
+      padding: 0.75rem;
+      background-color: var(--err-bg);
+      color: var(--err-fg);
+      border: 2px solid var(--err-border);
+      border-radius: 6px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+
+    .error-actions {
+      margin-top: 0.5rem;
+    }
+
+    .log-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .log-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+      padding: 0.625rem 0.75rem;
+      background-color: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stamp {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 3.25rem;
+      padding: 0.1875rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 800;
+      font-size: 0.875rem;
+      color: var(--punch-fg);
+    }
+
+    .stamp-in {
+      background-color: var(--in-bg);
+      border: 1.5px solid var(--in-border);
+    }
+
+    .stamp-out {
+      background-color: var(--out-bg);
+      border: 1.5px solid var(--out-border);
+    }
+
+    .log-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.25rem 0.75rem;
+    }
+
+    .log-time {
+      font-weight: 700;
+      font-size: 0.9375rem;
+    }
+
+    .log-date {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    dialog {
+      max-width: 24rem;
+      width: calc(100% - 2rem);
+      background-color: var(--surface);
+      color: var(--text);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.55);
+    }
+
+    dialog h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.125rem;
+    }
+
+    dialog p {
+      margin: 0 0 1rem;
+      font-size: 0.9375rem;
+    }
+
+    .dialog-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .danger-btn {
+      background-color: var(--out-bg);
+      color: var(--punch-fg);
+      border-color: var(--out-border);
+    }
+
+    .danger-btn:hover:not(:disabled) {
+      background-color: var(--out-hover);
+      color: var(--punch-fg);
+    }
+
+    .site-footer {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--divider);
+    }
+
+    .install-details summary {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+      padding: 0.375rem 0.75rem;
+      font-weight: 600;
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      background-color: var(--surface);
+    }
+
+    .install-details summary:hover {
+      border-width: 2px;
+    }
+
+    .install-steps {
+      margin: 0.75rem 0 0;
+      padding-left: 1.25rem;
+      font-size: 0.9375rem;
+    }
+
+    .install-steps li + li {
+      margin-top: 0.25rem;
+    }
+
+    .footer-meta {
+      margin: 0.75rem 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    /* Tablet / narrow laptop layout state */
+    @media (min-width: 40rem) {
+      body {
+        padding: 1.5rem;
+      }
+
+      .layout-grid {
+        grid-template-columns: minmax(17rem, 21rem) minmax(0, 1fr);
+        gap: 1.25rem;
+        align-items: start;
+      }
+
+      .panel {
+        padding: 1.25rem;
+      }
+
+      .punch-circle {
+        width: 11.5rem;
+        height: 11.5rem;
+      }
+    }
+
+    /* Desktop wide layout state */
+    @media (min-width: 64rem) {
+      body {
+        padding: 2rem;
+      }
+
+      .layout-grid {
+        grid-template-columns: 24rem minmax(0, 1fr);
+        gap: 1.75rem;
+      }
+
+      .panel {
+        padding: 1.5rem;
+      }
+
+      .punch-circle {
+        width: 12rem;
+        height: 12rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition: none !important;
+        animation: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+  <script src="./logic.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <div class="brand-block">
+        <h1><span class="logo-placeholder">[LOGO]</span>Work Clock</h1>
+        <p class="draft-note">Draft without direction (iOS Home Screen prototype)</p>
+      </div>
+      <button type="button" id="theme-toggle" class="secondary-btn" aria-pressed="false">
+        Switch to dark theme
+      </button>
+    </header>
+
+    <nav class="section-nav" aria-label="App sections">
+      <a href="#punch-section">Punch clock</a>
+      <a href="#pay-section">Today's pay</a>
+      <a href="#log-section">Recorded log</a>
+    </nav>
+
+    <main id="main-content">
+      <div id="storage-error" class="error-box" role="alert" hidden>
+        <span id="storage-error-text"></span>
+        <div class="error-actions">
+          <button type="button" id="reset-storage-btn" class="secondary-btn">Reset local data</button>
+        </div>
+      </div>
+
+      <div class="layout-grid">
+        <div class="primary-col">
+          <section id="punch-section" class="panel" aria-labelledby="punch-heading">
+            <h2 id="punch-heading">Shift punch</h2>
+            <p id="today-date" class="meta-line">Today</p>
+            <div class="punch-zone">
+              <button
+                type="button"
+                id="punch-btn"
+                class="punch-circle"
+                data-state="in"
+                aria-describedby="punch-status"
+              >IN</button>
+              <p id="punch-status" class="status-line" role="status" aria-live="polite">
+                Currently clocked out. Tap IN to start recording work time.
+              </p>
+            </div>
+          </section>
+
+          <section id="pay-section" class="panel" aria-labelledby="pay-heading">
+            <h2 id="pay-heading">Hourly rate and today's pay</h2>
+            <div class="field-group">
+              <label for="hourly-rate">Hourly rate (RM)</label>
+              <div class="rate-input-wrap">
+                <span class="currency-prefix" aria-hidden="true">RM</span>
+                <input
+                  id="hourly-rate"
+                  name="hourly-rate"
+                  type="number"
+                  inputmode="decimal"
+                  min="0"
+                  max="100000"
+                  step="0.01"
+                  placeholder="0.00"
+                  aria-describedby="rate-help rate-error"
+                >
+              </div>
+              <p id="rate-help" class="help-line">
+                Enter your hourly pay rate to calculate today's earnings from IN and OUT records.
+              </p>
+              <p id="rate-error" class="error-box" role="alert" hidden></p>
+            </div>
+
+            <div class="equation-box" aria-live="polite">
+              <p class="equation-formula">
+                (<span id="eq-rate">RM 0.00</span>) &times; (<span id="eq-hours">0.00 hrs</span>) = <strong id="eq-total">RM 0.00</strong>
+              </p>
+              <p id="eq-duration" class="equation-caption">Completed time today: 0h 0m 0s</p>
+            </div>
+          </section>
+        </div>
+
+        <section id="log-section" class="panel" aria-labelledby="log-heading">
+          <div class="log-header">
+            <h2 id="log-heading">Recorded IN and OUT log</h2>
+            <button type="button" id="open-clear-btn" class="secondary-btn" disabled>
+              Clear log
+            </button>
+          </div>
+          <p id="log-loading" class="state-box" role="status">
+            Loading saved punch records from device storage...
+          </p>
+          <p id="log-empty" class="state-box" hidden>
+            No IN or OUT records yet. Tap the circle IN button to record your first date and time.
+          </p>
+          <ol id="log-list" class="log-list" hidden></ol>
+        </section>
+      </div>
+
+      <dialog id="clear-dialog" aria-labelledby="clear-dialog-title">
+        <h2 id="clear-dialog-title">Clear recorded punches?</h2>
+        <p>This deletes every saved IN and OUT timestamp on this device. Your hourly rate stays saved.</p>
+        <div class="dialog-actions">
+          <button type="button" id="cancel-clear-btn" class="secondary-btn">Cancel</button>
+          <button type="button" id="confirm-clear-btn" class="secondary-btn danger-btn">Confirm clear</button>
+        </div>
+      </dialog>
+    </main>
+
+    <footer class="site-footer">
+      <details id="ios-install-help" class="install-details" open>
+        <summary>Install on iPhone Home Screen</summary>
+        <ol class="install-steps">
+          <li>Open this app URL in Safari on your iPhone.</li>
+          <li>Tap the Share icon in the Safari toolbar.</li>
+          <li>Choose Add to Home Screen, then tap Add in the top corner.</li>
+        </ol>
+      </details>
+      <p class="footer-meta">Records stay in local browser storage on your device. Placeholder [LOGO] awaits brand icon.</p>
+    </footer>
+  </div>
+</body>
+</html>
