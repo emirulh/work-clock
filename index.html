@@ -166,15 +166,11 @@
       background-color: var(--surface);
       border: 1.5px solid var(--border);
       border-radius: 10px;
-      transition: transform 140ms var(--ease-spring), background-color 180ms var(--ease-ios), border-color 180ms var(--ease-ios);
-    }
-
-    .chip-btn:hover:not(:disabled) {
-      background-color: var(--surface-elevated);
+      transition: transform 160ms var(--ease-spring), background-color 180ms var(--ease-ios), border-color 180ms var(--ease-ios), box-shadow 180ms var(--ease-ios);
     }
 
     .chip-btn:active:not(:disabled) {
-      transform: scale(0.96);
+      transform: scale(0.95);
     }
 
     .chip-btn:disabled {
@@ -188,8 +184,52 @@
       border-color: var(--in-border);
     }
 
-    .primary-btn:hover:not(:disabled) {
-      background-color: var(--in-hover);
+    @media (hover: hover) and (pointer: fine) {
+      .chip-btn:hover:not(:disabled) {
+        background-color: var(--surface-elevated);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      }
+
+      .primary-btn:hover:not(:disabled) {
+        background-color: var(--in-hover);
+      }
+
+      .punch-circle:hover {
+        background-color: var(--in-hover);
+        transform: scale(1.025);
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.38), inset 0 1.5px 0 rgba(255, 255, 255, 0.32);
+      }
+
+      .punch-circle[data-state="out"]:hover {
+        background-color: var(--out-hover);
+      }
+
+      .cal-cell:hover {
+        border-color: var(--text);
+        transform: translateY(-1px);
+      }
+
+      .dock-tab:hover:not([data-active="true"]) {
+        opacity: 0.82;
+      }
+
+      .swipe-edit:hover {
+        background-color: #1E40AF;
+      }
+
+      .swipe-delete:hover {
+        background-color: var(--out-hover);
+      }
+
+      .row-reveal-btn:hover {
+        color: var(--text);
+        border-color: var(--border);
+      }
+
+      .danger-btn:hover:not(:disabled) {
+        background-color: var(--out-hover);
+      }
     }
 
     .app-main {
@@ -266,6 +306,7 @@
     }
 
     .punch-circle {
+      position: relative;
       width: clamp(10.5rem, 24dvh, 12.25rem);
       height: clamp(10.5rem, 24dvh, 12.25rem);
       border-radius: 50%;
@@ -281,24 +322,45 @@
       user-select: none;
       -webkit-tap-highlight-color: transparent;
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32), inset 0 1.5px 0 rgba(255, 255, 255, 0.25);
-      transition: transform 150ms var(--ease-spring), background-color 260ms var(--ease-ios), border-color 260ms var(--ease-ios), box-shadow 260ms var(--ease-ios);
+      transition: transform 180ms var(--ease-spring), background-color 260ms var(--ease-ios), border-color 260ms var(--ease-ios), box-shadow 260ms var(--ease-ios);
     }
 
-    .punch-circle:hover {
-      background-color: var(--in-hover);
+    .punch-circle::after {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid var(--in-border);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .punch-circle[data-state="out"]::after {
+      border-color: var(--out-border);
+    }
+
+    .punch-circle.is-pulsing::after {
+      animation: punch-ring 460ms var(--ease-ios) forwards;
+    }
+
+    @keyframes punch-ring {
+      from {
+        opacity: 0.75;
+        transform: scale(1);
+      }
+      to {
+        opacity: 0;
+        transform: scale(1.22);
+      }
     }
 
     .punch-circle:active {
-      transform: scale(0.94);
+      transform: scale(0.93);
     }
 
     .punch-circle[data-state="out"] {
       background-color: var(--out-bg);
       border-color: var(--out-border);
-    }
-
-    .punch-circle[data-state="out"]:hover {
-      background-color: var(--out-hover);
     }
 
     .punch-status {
@@ -681,7 +743,7 @@
       position: absolute;
       top: 0;
       bottom: 0;
-      left: 0;
+      right: 0;
       width: 148px;
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -695,22 +757,19 @@
       font-weight: 800;
       color: #FFFFFF;
       padding: 0 0.5rem;
+      transition: transform 140ms var(--ease-spring), background-color 160ms var(--ease-ios);
+    }
+
+    .swipe-btn:active {
+      transform: scale(0.95);
     }
 
     .swipe-edit {
       background-color: #1D4ED8;
     }
 
-    .swipe-edit:hover {
-      background-color: #1E40AF;
-    }
-
     .swipe-delete {
       background-color: var(--out-bg);
-    }
-
-    .swipe-delete:hover {
-      background-color: var(--out-hover);
     }
 
     .swipe-surface {
@@ -724,12 +783,12 @@
       padding: 0.5rem 0.875rem;
       background-color: var(--surface);
       font-variant-numeric: tabular-nums;
-      transition: transform 260ms var(--ease-ios);
+      transition: transform 280ms var(--ease-ios);
       touch-action: pan-y;
     }
 
     .swipe-item[data-swiped="true"] .swipe-surface {
-      transform: translate3d(148px, 0, 0);
+      transform: translate3d(-148px, 0, 0);
     }
 
     .log-left {
@@ -778,20 +837,21 @@
     .row-reveal-btn {
       min-height: 2.75rem;
       min-width: 2.75rem;
-      padding: 0.25rem 0.625rem;
+      padding: 0.25rem 0.5rem;
       font-family: inherit;
-      font-size: 0.8125rem;
+      font-size: 1rem;
       font-weight: 700;
+      letter-spacing: 0.08em;
       color: var(--muted);
       background-color: transparent;
-      border: 1px solid var(--divider);
+      border: 1px solid transparent;
       border-radius: 8px;
       flex-shrink: 0;
+      transition: transform 140ms var(--ease-spring), color 160ms var(--ease-ios), border-color 160ms var(--ease-ios);
     }
 
-    .row-reveal-btn:hover {
-      color: var(--text);
-      border-color: var(--border);
+    .row-reveal-btn:active {
+      transform: scale(0.92);
     }
 
     .state-box {
@@ -816,6 +876,7 @@
     }
 
     .bottom-dock {
+      position: relative;
       pointer-events: auto;
       max-width: 22rem;
       margin: 0 auto;
@@ -831,7 +892,23 @@
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36), inset 0 1px 0 var(--glass-specular);
     }
 
+    .dock-indicator {
+      position: absolute;
+      top: 0.375rem;
+      bottom: 0.375rem;
+      left: 0.375rem;
+      width: calc((100% - 0.75rem - 0.75rem) / 3);
+      border-radius: 9999px;
+      background-color: var(--tab-active-bg);
+      transform: translate3d(calc(var(--tab-index, 1) * (100% + 0.375rem)), 0, 0);
+      transition: transform 320ms var(--ease-ios);
+      pointer-events: none;
+      z-index: 0;
+    }
+
     .dock-tab {
+      position: relative;
+      z-index: 1;
       min-height: 3rem;
       padding: 0.25rem 0.5rem;
       border: none;
@@ -846,15 +923,14 @@
       align-items: center;
       justify-content: center;
       gap: 0.125rem;
-      transition: transform 150ms var(--ease-spring), background-color 240ms var(--ease-ios), color 240ms var(--ease-ios);
+      transition: transform 150ms var(--ease-spring), color 220ms var(--ease-ios), opacity 180ms var(--ease-ios);
     }
 
     .dock-tab:active {
-      transform: scale(0.94);
+      transform: scale(0.93);
     }
 
     .dock-tab[data-active="true"] {
-      background-color: var(--tab-active-bg);
       color: var(--tab-active-fg);
     }
 
@@ -1066,7 +1142,7 @@
         <h2>Punch logs</h2>
         <button type="button" id="open-clear-btn" class="chip-btn" disabled>Clear log</button>
       </div>
-      <p class="log-hint">Slide right on any IN or OUT row (or tap Edit) to change time or delete it.</p>
+      <p class="log-hint">Swipe left on any IN or OUT row to edit or delete, swipe right to close.</p>
       <p id="log-loading" class="state-box" role="status">Loading saved punch records from device storage...</p>
       <p id="log-empty" class="state-box" hidden>No IN or OUT records yet. Switch to Clock and tap IN to record your first shift.</p>
       <div id="log-groups" class="log-groups" hidden></div>
@@ -1074,7 +1150,8 @@
   </main>
 
   <footer class="bottom-nav-wrap">
-    <nav class="bottom-dock" role="tablist" aria-label="Main views">
+    <nav id="bottom-dock" class="bottom-dock" role="tablist" aria-label="Main views" style="--tab-index: 1">
+      <span class="dock-indicator" aria-hidden="true"></span>
       <button type="button" id="tab-calendar" class="dock-tab" role="tab" data-tab-target="calendar" aria-controls="view-calendar" aria-selected="false">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Calendar</span>

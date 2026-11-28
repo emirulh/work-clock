@@ -25,6 +25,7 @@
     cardEarned: document.getElementById("card-earned"),
     cardFormula: document.getElementById("card-formula"),
     cardRateTrigger: document.getElementById("card-rate-trigger"),
+    bottomDock: document.getElementById("bottom-dock"),
     tabButtons: Array.prototype.slice.call(document.querySelectorAll("[data-tab-target]")),
     tabPanels: {
       calendar: document.getElementById("view-calendar"),
@@ -183,6 +184,10 @@
     }
     state.activeTab = tabName;
     state.openSwipeId = null;
+    var tabIndexMap = { calendar: "0", clock: "1", logs: "2" };
+    if (els.bottomDock && els.bottomDock.style && els.bottomDock.style.setProperty) {
+      els.bottomDock.style.setProperty("--tab-index", tabIndexMap[tabName] || "1");
+    }
     for (var i = 0; i < els.tabButtons.length; i++) {
       var btn = els.tabButtons[i];
       var isActive = btn.getAttribute("data-tab-target") === tabName;
@@ -268,9 +273,10 @@
     var horizontalLocked = false;
 
     function applyOffset(px, animate) {
-      currentOffset = Math.max(0, Math.min(SWIPE_REVEAL_PX, px));
+      // Negative X slides left to reveal right-edge actions; 0 closes back to the right.
+      currentOffset = Math.min(0, Math.max(-SWIPE_REVEAL_PX, px));
       if (surface.style) {
-        surface.style.transition = animate ? "transform 260ms var(--ease-ios)" : "none";
+        surface.style.transition = animate ? "transform 280ms var(--ease-ios)" : "none";
         surface.style.transform = "translate3d(" + String(currentOffset) + "px, 0, 0)";
       }
     }
@@ -278,7 +284,7 @@
     function onStart(x, y) {
       startX = x;
       startY = y;
-      baseOffset = wrapper.getAttribute("data-swiped") === "true" ? SWIPE_REVEAL_PX : 0;
+      baseOffset = wrapper.getAttribute("data-swiped") === "true" ? -SWIPE_REVEAL_PX : 0;
       currentOffset = baseOffset;
       tracking = true;
       horizontalLocked = false;
@@ -315,10 +321,10 @@
       if (!horizontalLocked) {
         return;
       }
-      var shouldOpen = currentOffset > SWIPE_REVEAL_PX * 0.35;
+      var shouldOpen = currentOffset < -SWIPE_REVEAL_PX * 0.35;
       state.openSwipeId = shouldOpen ? punchId : null;
       wrapper.setAttribute("data-swiped", shouldOpen ? "true" : "false");
-      applyOffset(shouldOpen ? SWIPE_REVEAL_PX : 0, true);
+      applyOffset(shouldOpen ? -SWIPE_REVEAL_PX : 0, true);
     }
 
     surface.addEventListener("touchstart", function (e) {
@@ -371,7 +377,7 @@
     var surface = document.createElement("div");
     surface.className = "swipe-surface";
     if (isOpen && surface.style) {
-      surface.style.transform = "translate3d(" + String(SWIPE_REVEAL_PX) + "px, 0, 0)";
+      surface.style.transform = "translate3d(-" + String(SWIPE_REVEAL_PX) + "px, 0, 0)";
     }
 
     var left = document.createElement("div");
@@ -398,10 +404,10 @@
     var revealToggle = document.createElement("button");
     revealToggle.type = "button";
     revealToggle.className = "row-reveal-btn";
-    revealToggle.textContent = isOpen ? "Close" : "Edit";
+    revealToggle.textContent = isOpen ? "Close" : "...";
     revealToggle.setAttribute("data-toggle-swipe", item.id);
     revealToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    revealToggle.setAttribute("aria-label", "Reveal edit and delete actions for " + item.type + " punch");
+    revealToggle.setAttribute("aria-label", "Toggle edit and delete actions for " + item.type + " punch");
 
     surface.appendChild(left);
     surface.appendChild(revealToggle);
@@ -617,6 +623,11 @@
       state.punches = Logic.recordPunch(state.punches, Date.now());
       saveState();
       render();
+      if (els.punchBtn.classList) {
+        els.punchBtn.classList.remove("is-pulsing");
+        void els.punchBtn.offsetWidth;
+        els.punchBtn.classList.add("is-pulsing");
+      }
     });
 
     els.rateChip.addEventListener("click", openRateModal);
