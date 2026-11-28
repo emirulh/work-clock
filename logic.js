@@ -49,6 +49,24 @@
     return list;
   }
 
+  function parseDateParts(dateStr) {
+    if (typeof dateStr !== "string") {
+      return null;
+    }
+    var m = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) {
+      return null;
+    }
+    var year = Number(m[1]);
+    var month = Number(m[2]) - 1;
+    var day = Number(m[3]);
+    var test = new Date(year, month, day);
+    if (test.getFullYear() !== year || test.getMonth() !== month || test.getDate() !== day) {
+      return null;
+    }
+    return { year: year, month: month, day: day };
+  }
+
   function parseTimeParts(timeStr) {
     if (typeof timeStr !== "string") {
       return null;
@@ -154,6 +172,57 @@
     });
   }
 
+  function deletePunchById(punches, id) {
+    if (!Array.isArray(punches) || !id) {
+      return Array.isArray(punches) ? punches.slice() : [];
+    }
+    return punches.filter(function (item) {
+      return !item || item.id !== id;
+    });
+  }
+
+  function updatePunchById(punches, id, dateStr, timeStr, restRaw) {
+    var dateParts = parseDateParts(dateStr);
+    var timeParts = parseTimeParts(timeStr);
+    if (!dateParts || !timeParts) {
+      return { valid: false, error: "Enter a valid date and time.", punches: punches };
+    }
+    var restCheck = parseRestMinutes(restRaw);
+    if (!restCheck.valid) {
+      return { valid: false, error: restCheck.error, punches: punches };
+    }
+    var list = Array.isArray(punches) ? punches.slice() : [];
+    var found = false;
+    var nextMs = new Date(dateParts.year, dateParts.month, dateParts.day, timeParts.h, timeParts.m, 0, 0).getTime();
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      if (item && item.id === id) {
+        found = true;
+        var updated = {
+          id: item.id,
+          type: item.type,
+          ms: nextMs,
+          iso: new Date(nextMs).toISOString(),
+          manual: Boolean(item.manual),
+          pairId: item.pairId || null
+        };
+        if (item.type === "OUT") {
+          updated.restMs = restCheck.mins * 60000;
+        }
+        list[i] = updated;
+        break;
+      }
+    }
+    if (!found) {
+      return { valid: false, error: "Punch record not found.", punches: punches };
+    }
+    list.sort(function (a, b) {
+      return a.ms - b.ms;
+    });
+    return { valid: true, error: "", punches: list };
+  }
+
   function getDayBounds(nowMs) {
     var d = new Date(nowMs);
     var start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
@@ -163,6 +232,16 @@
 
   function pad2(n) {
     return n < 10 ? "0" + String(n) : String(n);
+  }
+
+  function toDateInputValue(ms) {
+    var d = new Date(ms);
+    return String(d.getFullYear()) + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
+  function toTimeInputValue(ms) {
+    var d = new Date(ms);
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
   }
 
   function formatHms(ms) {
@@ -278,6 +357,45 @@
     return calculateDaySummary(punches, rate, ts, ts);
   }
 
+  function groupPunchesByDate(punches, rate, nowMs) {
+    var list = Array.isArray(punches) ? punches : [];
+    var groupsByKey = {};
+    var keys = [];
+
+    for (var i = list.length - 1; i >= 0; i--) {
+      var item = list[i];
+      if (!item || typeof item.ms !== "number") {
+        continue;
+      }
+      var key = toDateInputValue(item.ms);
+      if (!groupsByKey[key]) {
+        var d = new Date(item.ms);
+        var dayMid = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0).getTime();
+        var summary = calculateDaySummary(list, rate, dayMid, nowMs);
+        groupsByKey[key] = {
+          dateKey: key,
+          dayMs: dayMid,
+          hms: summary.liveHms,
+          hoursText: summary.hoursText,
+          earnedText: summary.earnedText,
+          punches: []
+        };
+        keys.push(key);
+      }
+      groupsByKey[key].punches.push(item);
+    }
+
+    keys.sort(function (a, b) {
+      return a < b ? 1 : (a > b ? -1 : 0);
+    });
+
+    var result = [];
+    for (var k = 0; k < keys.length; k++) {
+      result.push(groupsByKey[keys[k]]);
+    }
+    return result;
+  }
+
   function getMonthSummary(punches, rate, year, month, nowMs) {
     var daysInMonth = new Date(year, month + 1, 0).getDate();
     var firstWeekday = new Date(year, month, 1).getDay();
@@ -319,12 +437,17 @@
     previewManualShift: previewManualShift,
     addManualShift: addManualShift,
     deleteShiftByPairId: deleteShiftByPairId,
+    deletePunchById: deletePunchById,
+    updatePunchById: updatePunchById,
+    toDateInputValue: toDateInputValue,
+    toTimeInputValue: toTimeInputValue,
     getDayBounds: getDayBounds,
     formatHms: formatHms,
     formatHours: formatHours,
     formatRM: formatRM,
     calculateDaySummary: calculateDaySummary,
     calculateTodaySummary: calculateTodaySummary,
+    groupPunchesByDate: groupPunchesByDate,
     getMonthSummary: getMonthSummary
   };
 });

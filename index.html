@@ -609,43 +609,133 @@
       gap: 0.5rem;
     }
 
-    /* Logs & Rows */
-    .state-box {
-      margin: 0;
-      padding: 0.875rem;
-      background-color: var(--bg);
-      border: 1.5px dashed var(--border);
-      border-radius: 10px;
-      font-size: 0.9375rem;
-      color: var(--text);
+    /* Grouped Date Sections & iOS Swipe-Right Reveal Rows */
+    .log-hint {
+      margin: 0 0 0.75rem;
+      font-size: 0.8125rem;
+      color: var(--muted);
     }
 
-    .log-list {
+    .log-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .date-group {
+      background-color: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .date-group-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      background-color: var(--surface-elevated);
+      border-bottom: 1px solid var(--divider);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .date-group-title {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 800;
+    }
+
+    .date-group-stats {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .swipe-list {
       list-style: none;
       margin: 0;
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
     }
 
-    .log-row {
+    .cal-day-box .swipe-list {
+      border: 1.5px solid var(--divider);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .swipe-item {
+      position: relative;
+      overflow: hidden;
+      background-color: var(--surface);
+    }
+
+    .swipe-item + .swipe-item {
+      border-top: 1px solid var(--divider);
+    }
+
+    .swipe-actions {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 148px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .swipe-btn {
+      min-height: 2.75rem;
+      border: none;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      padding: 0 0.5rem;
+    }
+
+    .swipe-edit {
+      background-color: #1D4ED8;
+    }
+
+    .swipe-edit:hover {
+      background-color: #1E40AF;
+    }
+
+    .swipe-delete {
+      background-color: var(--out-bg);
+    }
+
+    .swipe-delete:hover {
+      background-color: var(--out-hover);
+    }
+
+    .swipe-surface {
+      position: relative;
+      z-index: 1;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-wrap: wrap;
       gap: 0.5rem;
-      padding: 0.625rem 0.75rem;
-      background-color: var(--bg);
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
+      min-height: 3.375rem;
+      padding: 0.5rem 0.875rem;
+      background-color: var(--surface);
       font-variant-numeric: tabular-nums;
+      transition: transform 260ms var(--ease-ios);
+      touch-action: pan-y;
     }
 
-    .log-left,
-    .log-right {
+    .swipe-item[data-swiped="true"] .swipe-surface {
+      transform: translate3d(148px, 0, 0);
+    }
+
+    .log-left {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 0.5rem;
     }
 
@@ -685,26 +775,33 @@
       font-size: 0.9375rem;
     }
 
-    .log-date {
-      font-size: 0.8125rem;
-      color: var(--muted);
-    }
-
-    .mini-delete-btn {
+    .row-reveal-btn {
       min-height: 2.75rem;
       min-width: 2.75rem;
       padding: 0.25rem 0.625rem;
       font-family: inherit;
       font-size: 0.8125rem;
       font-weight: 700;
-      color: var(--punch-fg);
-      background-color: var(--out-bg);
-      border: 1.5px solid var(--out-border);
+      color: var(--muted);
+      background-color: transparent;
+      border: 1px solid var(--divider);
       border-radius: 8px;
+      flex-shrink: 0;
     }
 
-    .mini-delete-btn:active {
-      transform: scale(0.95);
+    .row-reveal-btn:hover {
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .state-box {
+      margin: 0;
+      padding: 0.875rem;
+      background-color: var(--bg);
+      border: 1.5px dashed var(--border);
+      border-radius: 10px;
+      font-size: 0.9375rem;
+      color: var(--text);
     }
 
     /* Liquid Glass Surface 2: Floating iOS Pill Tab Bar */
@@ -918,7 +1015,7 @@
         </div>
 
         <p id="cal-day-empty" class="state-box">No shifts recorded on this date. Tap Add shift to log a missed day.</p>
-        <ol id="cal-day-list" class="log-list" hidden></ol>
+        <ol id="cal-day-list" class="swipe-list" hidden></ol>
       </div>
     </section>
 
@@ -969,9 +1066,10 @@
         <h2>Punch logs</h2>
         <button type="button" id="open-clear-btn" class="chip-btn" disabled>Clear log</button>
       </div>
+      <p class="log-hint">Slide right on any IN or OUT row (or tap Edit) to change time or delete it.</p>
       <p id="log-loading" class="state-box" role="status">Loading saved punch records from device storage...</p>
       <p id="log-empty" class="state-box" hidden>No IN or OUT records yet. Switch to Clock and tap IN to record your first shift.</p>
-      <ol id="log-list" class="log-list" hidden></ol>
+      <div id="log-groups" class="log-groups" hidden></div>
     </section>
   </main>
 
@@ -1005,6 +1103,29 @@
       <button type="button" id="close-rate-btn" class="chip-btn primary-btn">Done</button>
     </div>
     <p class="install-tip">iPhone Home Screen: open in Safari, tap Share, then choose Add to Home Screen.</p>
+  </dialog>
+
+  <dialog id="edit-punch-dialog" aria-labelledby="edit-punch-title">
+    <h2 id="edit-punch-title">Edit punch time</h2>
+    <div class="shift-form">
+      <div class="field-stack">
+        <label for="edit-punch-date" class="field-label">Date</label>
+        <input id="edit-punch-date" class="ios-input" type="date">
+      </div>
+      <div class="field-stack">
+        <label for="edit-punch-time" class="field-label">Time</label>
+        <input id="edit-punch-time" class="ios-input" type="time">
+      </div>
+      <div id="edit-rest-wrap" class="field-stack" hidden>
+        <label for="edit-punch-rest" class="field-label">Resting time (mins)</label>
+        <input id="edit-punch-rest" class="ios-input" type="number" inputmode="numeric" min="0" max="720" step="5" value="0">
+      </div>
+    </div>
+    <p id="edit-punch-error" class="error-box" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="cancel-edit-btn" class="chip-btn">Cancel</button>
+      <button type="button" id="save-edit-btn" class="chip-btn primary-btn">Save changes</button>
+    </div>
   </dialog>
 
   <dialog id="clear-dialog" aria-labelledby="clear-dialog-title">

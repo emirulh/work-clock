@@ -4,6 +4,7 @@
   // shortcut: localStorage holds punches on one device only, move to server DB for multi-device sync.
   var STORAGE_KEY = "work_clock_v1";
   var THEME_KEY = "work_clock_theme_v1";
+  var SWIPE_REVEAL_PX = 148;
 
   var Logic = window.WorkClockLogic;
 
@@ -50,12 +51,21 @@
     saveManualBtn: document.getElementById("save-manual-btn"),
     logLoading: document.getElementById("log-loading"),
     logEmpty: document.getElementById("log-empty"),
-    logList: document.getElementById("log-list"),
+    logGroups: document.getElementById("log-groups"),
     openClearBtn: document.getElementById("open-clear-btn"),
     rateDialog: document.getElementById("rate-dialog"),
     rateInput: document.getElementById("hourly-rate"),
     rateError: document.getElementById("rate-error"),
     closeRateBtn: document.getElementById("close-rate-btn"),
+    editDialog: document.getElementById("edit-punch-dialog"),
+    editTitle: document.getElementById("edit-punch-title"),
+    editDate: document.getElementById("edit-punch-date"),
+    editTime: document.getElementById("edit-punch-time"),
+    editRestWrap: document.getElementById("edit-rest-wrap"),
+    editRest: document.getElementById("edit-punch-rest"),
+    editError: document.getElementById("edit-punch-error"),
+    cancelEditBtn: document.getElementById("cancel-edit-btn"),
+    saveEditBtn: document.getElementById("save-edit-btn"),
     clearDialog: document.getElementById("clear-dialog"),
     cancelClearBtn: document.getElementById("cancel-clear-btn"),
     confirmClearBtn: document.getElementById("confirm-clear-btn")
@@ -70,7 +80,9 @@
     calYear: nowInit.getFullYear(),
     calMonth: nowInit.getMonth(),
     selectedDay: nowInit.getDate(),
-    manualOpen: false
+    manualOpen: false,
+    editingPunchId: null,
+    openSwipeId: null
   };
 
   function formatDateShort(ms) {
@@ -110,7 +122,7 @@
     var active = theme === "light" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", active);
     if (els.metaThemeColor) {
-      els.metaThemeColor.setAttribute("content", active === "light" ? "#F6F4EF" : "#111214");
+      els.metaThemeColor.setAttribute("content", active === "light" ? "#F2F2F7" : "#111214");
     }
     if (els.themeToggle) {
       var isDark = active === "dark";
@@ -170,6 +182,7 @@
       return;
     }
     state.activeTab = tabName;
+    state.openSwipeId = null;
     for (var i = 0; i < els.tabButtons.length; i++) {
       var btn = els.tabButtons[i];
       var isActive = btn.getAttribute("data-tab-target") === tabName;
@@ -216,9 +229,150 @@
     }
   }
 
-  function buildPunchRow(item, allowDelete) {
+  function openEditModal(punchId) {
+    var target = null;
+    for (var i = 0; i < state.punches.length; i++) {
+      if (state.punches[i] && state.punches[i].id === punchId) {
+        target = state.punches[i];
+        break;
+      }
+    }
+    if (!target) {
+      return;
+    }
+    state.editingPunchId = target.id;
+    els.editTitle.textContent = "Edit " + target.type + " time";
+    els.editDate.value = Logic.toDateInputValue(target.ms);
+    els.editTime.value = Logic.toTimeInputValue(target.ms);
+    if (target.type === "OUT") {
+      els.editRestWrap.hidden = false;
+      els.editRest.value = String(Math.round((target.restMs || 0) / 60000));
+    } else {
+      els.editRestWrap.hidden = true;
+      els.editRest.value = "0";
+    }
+    els.editError.hidden = true;
+    els.editError.textContent = "";
+    if (els.editDialog && typeof els.editDialog.showModal === "function") {
+      els.editDialog.showModal();
+      els.editTime.focus();
+    }
+  }
+
+  function attachSwipeHandlers(wrapper, surface, punchId) {
+    var startX = 0;
+    var startY = 0;
+    var baseOffset = 0;
+    var currentOffset = 0;
+    var tracking = false;
+    var horizontalLocked = false;
+
+    function applyOffset(px, animate) {
+      currentOffset = Math.max(0, Math.min(SWIPE_REVEAL_PX, px));
+      if (surface.style) {
+        surface.style.transition = animate ? "transform 260ms var(--ease-ios)" : "none";
+        surface.style.transform = "translate3d(" + String(currentOffset) + "px, 0, 0)";
+      }
+    }
+
+    function onStart(x, y) {
+      startX = x;
+      startY = y;
+      baseOffset = wrapper.getAttribute("data-swiped") === "true" ? SWIPE_REVEAL_PX : 0;
+      currentOffset = baseOffset;
+      tracking = true;
+      horizontalLocked = false;
+    }
+
+    function onMove(x, y, preventDefault) {
+      if (!tracking) {
+        return;
+      }
+      var dx = x - startX;
+      var dy = y - startY;
+      if (!horizontalLocked) {
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+          tracking = false;
+          return;
+        }
+        if (Math.abs(dx) > 8) {
+          horizontalLocked = true;
+        } else {
+          return;
+        }
+      }
+      if (preventDefault) {
+        preventDefault();
+      }
+      applyOffset(baseOffset + dx, false);
+    }
+
+    function onEnd() {
+      if (!tracking) {
+        return;
+      }
+      tracking = false;
+      if (!horizontalLocked) {
+        return;
+      }
+      var shouldOpen = currentOffset > SWIPE_REVEAL_PX * 0.35;
+      state.openSwipeId = shouldOpen ? punchId : null;
+      wrapper.setAttribute("data-swiped", shouldOpen ? "true" : "false");
+      applyOffset(shouldOpen ? SWIPE_REVEAL_PX : 0, true);
+    }
+
+    surface.addEventListener("touchstart", function (e) {
+      if (e.touches && e.touches.length === 1) {
+        onStart(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    surface.addEventListener("touchmove", function (e) {
+      if (e.touches && e.touches.length === 1) {
+        onMove(e.touches[0].clientX, e.touches[0].clientY, function () {
+          if (e.cancelable) {
+            e.preventDefault();
+          }
+        });
+      }
+    }, { passive: false });
+
+    surface.addEventListener("touchend", onEnd);
+    surface.addEventListener("touchcancel", onEnd);
+  }
+
+  function buildSwipePunchRow(item) {
     var li = document.createElement("li");
-    li.className = "log-row";
+    li.className = "swipe-item";
+    li.setAttribute("data-punch-id", item.id);
+    var isOpen = state.openSwipeId === item.id;
+    li.setAttribute("data-swiped", isOpen ? "true" : "false");
+
+    var actions = document.createElement("div");
+    actions.className = "swipe-actions";
+
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "swipe-btn swipe-edit";
+    editBtn.textContent = "Edit";
+    editBtn.setAttribute("data-edit-id", item.id);
+    editBtn.setAttribute("aria-label", "Edit " + item.type + " time");
+
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "swipe-btn swipe-delete";
+    delBtn.textContent = "Delete";
+    delBtn.setAttribute("data-delete-id", item.id);
+    delBtn.setAttribute("aria-label", "Delete " + item.type + " punch");
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    var surface = document.createElement("div");
+    surface.className = "swipe-surface";
+    if (isOpen && surface.style) {
+      surface.style.transform = "translate3d(" + String(SWIPE_REVEAL_PX) + "px, 0, 0)";
+    }
 
     var left = document.createElement("div");
     left.className = "log-left";
@@ -241,26 +395,21 @@
       left.appendChild(restTag);
     }
 
-    var right = document.createElement("div");
-    right.className = "log-right";
+    var revealToggle = document.createElement("button");
+    revealToggle.type = "button";
+    revealToggle.className = "row-reveal-btn";
+    revealToggle.textContent = isOpen ? "Close" : "Edit";
+    revealToggle.setAttribute("data-toggle-swipe", item.id);
+    revealToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    revealToggle.setAttribute("aria-label", "Reveal edit and delete actions for " + item.type + " punch");
 
-    var dateLine = document.createElement("span");
-    dateLine.className = "log-date";
-    dateLine.textContent = formatDateShort(item.ms);
-    right.appendChild(dateLine);
+    surface.appendChild(left);
+    surface.appendChild(revealToggle);
 
-    if (allowDelete && item.pairId && item.type === "OUT") {
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "mini-delete-btn";
-      delBtn.textContent = "Delete";
-      delBtn.setAttribute("data-delete-pair", item.pairId);
-      delBtn.setAttribute("aria-label", "Delete manual shift");
-      right.appendChild(delBtn);
-    }
+    li.appendChild(actions);
+    li.appendChild(surface);
 
-    li.appendChild(left);
-    li.appendChild(right);
+    attachSwipeHandlers(li, surface, item.id);
     return li;
   }
 
@@ -353,8 +502,8 @@
     } else {
       els.calDayEmpty.hidden = true;
       els.calDayList.hidden = false;
-      for (var p = 0; p < selectedEntry.punches.length; p++) {
-        els.calDayList.appendChild(buildPunchRow(selectedEntry.punches[p], true));
+      for (var p = selectedEntry.punches.length - 1; p >= 0; p--) {
+        els.calDayList.appendChild(buildSwipePunchRow(selectedEntry.punches[p]));
       }
     }
 
@@ -363,23 +512,51 @@
     }
   }
 
-  function renderLogsView() {
+  function renderLogsView(rate, nowMs) {
     els.logLoading.hidden = true;
     els.openClearBtn.disabled = state.punches.length === 0;
 
     if (state.punches.length === 0) {
       els.logEmpty.hidden = false;
-      els.logList.hidden = true;
-      els.logList.innerHTML = "";
+      els.logGroups.hidden = true;
+      els.logGroups.innerHTML = "";
       return;
     }
 
     els.logEmpty.hidden = true;
-    els.logList.hidden = false;
-    els.logList.innerHTML = "";
+    els.logGroups.hidden = false;
+    els.logGroups.innerHTML = "";
 
-    for (var i = state.punches.length - 1; i >= 0; i--) {
-      els.logList.appendChild(buildPunchRow(state.punches[i], false));
+    var groups = Logic.groupPunchesByDate(state.punches, rate, nowMs);
+    for (var g = 0; g < groups.length; g++) {
+      var group = groups[g];
+      var section = document.createElement("section");
+      section.className = "date-group";
+      section.setAttribute("aria-label", formatDateShort(group.dayMs));
+
+      var header = document.createElement("div");
+      header.className = "date-group-head";
+
+      var dateHeading = document.createElement("h3");
+      dateHeading.className = "date-group-title";
+      dateHeading.textContent = formatDateShort(group.dayMs);
+
+      var dayStats = document.createElement("span");
+      dayStats.className = "date-group-stats";
+      dayStats.textContent = group.hms + " | " + group.earnedText;
+
+      header.appendChild(dateHeading);
+      header.appendChild(dayStats);
+
+      var list = document.createElement("ol");
+      list.className = "swipe-list";
+      for (var p = 0; p < group.punches.length; p++) {
+        list.appendChild(buildSwipePunchRow(group.punches[p]));
+      }
+
+      section.appendChild(header);
+      section.appendChild(list);
+      els.logGroups.appendChild(section);
     }
   }
 
@@ -399,7 +576,33 @@
     if (state.activeTab === "calendar") {
       renderCalendarView(safeRate, nowMs);
     }
-    renderLogsView();
+    renderLogsView(safeRate, nowMs);
+  }
+
+  function handleSwipeContainerClick(e) {
+    var target = e.target;
+    if (!target || !target.getAttribute) {
+      return;
+    }
+    var toggleId = target.getAttribute("data-toggle-swipe");
+    if (toggleId) {
+      state.openSwipeId = state.openSwipeId === toggleId ? null : toggleId;
+      render();
+      return;
+    }
+    var editId = target.getAttribute("data-edit-id");
+    if (editId) {
+      state.openSwipeId = null;
+      openEditModal(editId);
+      return;
+    }
+    var deleteId = target.getAttribute("data-delete-id");
+    if (deleteId) {
+      state.openSwipeId = null;
+      state.punches = Logic.deletePunchById(state.punches, deleteId);
+      saveState();
+      render();
+    }
   }
 
   function openRateModal() {
@@ -455,6 +658,7 @@
         state.calMonth -= 1;
       }
       state.selectedDay = 1;
+      state.openSwipeId = null;
       render();
     });
 
@@ -466,6 +670,7 @@
         state.calMonth += 1;
       }
       state.selectedDay = 1;
+      state.openSwipeId = null;
       render();
     });
 
@@ -473,6 +678,7 @@
       var target = e.target;
       if (target && target.getAttribute && target.getAttribute("data-day")) {
         state.selectedDay = Number(target.getAttribute("data-day"));
+        state.openSwipeId = null;
         render();
       }
     });
@@ -517,14 +723,39 @@
       render();
     });
 
-    els.calDayList.addEventListener("click", function (e) {
-      var target = e.target;
-      if (target && target.getAttribute && target.getAttribute("data-delete-pair")) {
-        var pairId = target.getAttribute("data-delete-pair");
-        state.punches = Logic.deleteShiftByPairId(state.punches, pairId);
-        saveState();
-        render();
+    els.calDayList.addEventListener("click", handleSwipeContainerClick);
+    els.logGroups.addEventListener("click", handleSwipeContainerClick);
+
+    els.cancelEditBtn.addEventListener("click", function () {
+      state.editingPunchId = null;
+      if (els.editDialog && els.editDialog.open) {
+        els.editDialog.close();
       }
+    });
+
+    els.saveEditBtn.addEventListener("click", function () {
+      if (!state.editingPunchId) {
+        return;
+      }
+      var res = Logic.updatePunchById(
+        state.punches,
+        state.editingPunchId,
+        els.editDate.value,
+        els.editTime.value,
+        els.editRest.value
+      );
+      if (!res.valid) {
+        els.editError.hidden = false;
+        els.editError.textContent = res.error;
+        return;
+      }
+      state.punches = res.punches;
+      state.editingPunchId = null;
+      saveState();
+      if (els.editDialog && els.editDialog.open) {
+        els.editDialog.close();
+      }
+      render();
     });
 
     els.resetStorageBtn.addEventListener("click", function () {
@@ -559,6 +790,7 @@
 
     els.confirmClearBtn.addEventListener("click", function () {
       state.punches = [];
+      state.openSwipeId = null;
       saveState();
       if (els.clearDialog && els.clearDialog.open) {
         els.clearDialog.close();

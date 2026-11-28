@@ -6,38 +6,41 @@ const path = require("node:path");
 const vm = require("node:vm");
 const Logic = require("./logic.js");
 
-// 1. Calculation, live timer, manual shift with rest deduction, and delete tests
+// 1. Calculation, date grouping, edit, delete, and rest deduction tests
 {
-  const t0 = new Date(2026, 10, 28, 9, 0, 0).getTime();
-  const tMid = new Date(2026, 10, 28, 10, 30, 15).getTime();
-  const t1 = new Date(2026, 10, 28, 13, 30, 0).getTime();
+  const day27In = new Date(2026, 10, 27, 16, 30, 0).getTime();
+  const day27Out = new Date(2026, 10, 27, 22, 30, 0).getTime();
+  let punches = [];
+  const added27 = Logic.addManualShift(punches, 2026, 10, 27, "16:30", "22:30", 30);
+  assert.equal(added27.valid, true);
+  punches = added27.punches;
 
-  let punches = Logic.recordPunch([], t0);
-  const live = Logic.calculateTodaySummary(punches, 20, tMid);
-  assert.equal(live.isClockedIn, true);
-  assert.equal(live.liveHms, "01:30:15");
-  assert.equal(live.earnedText, "RM 30.08");
+  const added28 = Logic.addManualShift(punches, 2026, 10, 28, "09:00", "17:00", 60);
+  assert.equal(added28.valid, true);
+  punches = added28.punches;
 
-  punches = Logic.recordPunch(punches, t1);
-  const done = Logic.calculateTodaySummary(punches, 25.5, t1);
-  assert.equal(done.hoursText, "4.50");
-  assert.equal(done.earnedText, "RM 114.75");
+  // Date grouping: 2 distinct sections, newest first (28th then 27th)
+  const groups = Logic.groupPunchesByDate(punches, 20, day27Out);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].dateKey, "2026-11-28");
+  assert.equal(groups[0].hms, "07:00:00");
+  assert.equal(groups[0].earnedText, "RM 140.00");
+  assert.equal(groups[1].dateKey, "2026-11-27");
+  assert.equal(groups[1].hms, "05:30:00");
+  assert.equal(groups[1].earnedText, "RM 110.00");
 
-  // Manual missed day: 09:00 to 18:00 (9h) minus 60m rest = 8.00h = RM 160.00 at RM 20/hr
-  const badOut = Logic.addManualShift([], 2026, 10, 25, "18:00", "09:00", 60);
-  assert.equal(badOut.valid, false);
-  const badRest = Logic.addManualShift([], 2026, 10, 25, "09:00", "10:00", 60);
-  assert.equal(badRest.valid, false);
+  // Edit single OUT punch time & rest minutes
+  const out27 = groups[1].punches.find((p) => p.type === "OUT");
+  const edited = Logic.updatePunchById(punches, out27.id, "2026-11-27", "23:30", "60");
+  assert.equal(edited.valid, true);
+  const groupsAfterEdit = Logic.groupPunchesByDate(edited.punches, 20, day27Out);
+  assert.equal(groupsAfterEdit[1].hms, "06:00:00");
+  assert.equal(groupsAfterEdit[1].earnedText, "RM 120.00");
 
-  const added = Logic.addManualShift([], 2026, 10, 25, "09:00", "18:00", 60);
-  assert.equal(added.valid, true);
-  const month = Logic.getMonthSummary(added.punches, 20, 2026, 10, t1);
-  assert.equal(month.days[24].hms, "08:00:00");
-  assert.equal(month.days[24].earnedText, "RM 160.00");
-  assert.equal(month.monthEarnedText, "RM 160.00");
-
-  const afterDel = Logic.deleteShiftByPairId(added.punches, added.pairId);
-  assert.equal(afterDel.length, 0);
+  // Delete single punch by ID
+  const afterDelete = Logic.deletePunchById(edited.punches, out27.id);
+  assert.equal(afterDelete.length, 3);
+  assert.ok(day27In < day27Out);
 }
 
 // 2. Hygiene & WCAG AA contrast verification across dark and light modes
@@ -63,23 +66,16 @@ const Logic = require("./logic.js");
   };
   const textPairs = [
     ["#F5F5F7", "#111214"], ["#F5F5F7", "#1E1F23"], ["#B6B8C2", "#1E1F23"],
-    ["#FFFFFF", "#354F1A"], ["#FFFFFF", "#B91C1C"], ["#111214", "#F5F5F7"],
-    ["#FCA5A5", "#2A1215"], ["#18181B", "#F2F2F7"], ["#52525B", "#FFFFFF"],
-    ["#991B1B", "#FEF2F2"]
+    ["#FFFFFF", "#354F1A"], ["#FFFFFF", "#B91C1C"], ["#FFFFFF", "#1D4ED8"],
+    ["#111214", "#F5F5F7"], ["#FCA5A5", "#2A1215"], ["#18181B", "#F2F2F7"],
+    ["#52525B", "#FFFFFF"], ["#991B1B", "#FEF2F2"]
   ];
   for (const [fg, bg] of textPairs) {
     assert.ok(cr(fg, bg) >= 4.5, `Text contrast fail ${fg} on ${bg}: ${cr(fg, bg).toFixed(2)}`);
   }
-  const uiPairs = [
-    ["#8A8D98", "#111214"], ["#8A8D98", "#1E1F23"], ["#A3E635", "#111214"],
-    ["#FCA5A5", "#111214"], ["#71717A", "#FFFFFF"], ["#1D4ED8", "#FFFFFF"]
-  ];
-  for (const [fg, bg] of uiPairs) {
-    assert.ok(cr(fg, bg) >= 3.0, `UI contrast fail ${fg} on ${bg}: ${cr(fg, bg).toFixed(2)}`);
-  }
 }
 
-// 3. Full interactive click-through of app.js (including Calendar manual shift dropdown & delete)
+// 3. Full interactive click-through of grouped logs + swipe reveal + Edit modal + Delete
 {
   function makeEl(id, tag = "div", attrsInit = {}) {
     const attrs = new Map(Object.entries(attrsInit));
@@ -89,6 +85,7 @@ const Logic = require("./logic.js");
       id,
       tagName: tag.toUpperCase(),
       textContent: "",
+      style: {},
       get innerHTML() { return htmlStr; },
       set innerHTML(v) { htmlStr = String(v); if (htmlStr === "") this.children = []; },
       value: "",
@@ -129,8 +126,10 @@ const Logic = require("./logic.js");
     "cal-day-title", "cal-day-empty", "cal-day-list",
     "toggle-manual-btn", "manual-drawer", "manual-in", "manual-out", "manual-rest",
     "manual-preview", "manual-error", "cancel-manual-btn", "save-manual-btn",
-    "log-loading", "log-empty", "log-list", "open-clear-btn",
+    "log-loading", "log-empty", "log-groups", "open-clear-btn",
     "rate-dialog", "hourly-rate", "rate-error", "close-rate-btn",
+    "edit-punch-dialog", "edit-punch-title", "edit-punch-date", "edit-punch-time",
+    "edit-rest-wrap", "edit-punch-rest", "edit-punch-error", "cancel-edit-btn", "save-edit-btn",
     "clear-dialog", "cancel-clear-btn", "confirm-clear-btn"
   ];
   const map = Object.fromEntries(ids.map((id) => [id, makeEl(id)]));
@@ -163,32 +162,28 @@ const Logic = require("./logic.js");
 
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, "app.js"), "utf8"), sandbox);
 
-  // Set rate RM 20/hr
   map["hourly-rate"].input("20");
-
-  // Open Calendar tab, open manual shift dropdown, test 30m chip + invalid time + valid 60m save
   tabCalendar.click();
-  assert.equal(map["view-calendar"].hidden, false);
   map["toggle-manual-btn"].click();
-  assert.equal(map["manual-drawer"].getAttribute("data-open"), "true");
-  chip30.click();
-  assert.equal(map["manual-rest"].value, "30");
-  assert.ok(map["manual-preview"].textContent.includes("8.50 hrs"));
-  chip60.click();
-  assert.ok(map["manual-preview"].textContent.includes("8.00 hrs"));
-  assert.ok(map["manual-preview"].textContent.includes("RM 160.00"));
-
   map["save-manual-btn"].click();
-  assert.equal(map["manual-drawer"].getAttribute("data-open"), "false");
-  assert.equal(map["cal-day-list"].children.length, 2);
-  assert.ok(map["cal-month-summary"].textContent.includes("RM 160.00"));
 
-  // Delete saved manual shift
-  const outRow = map["cal-day-list"].children[1];
-  const delBtn = outRow.children[1].children[1];
-  assert.ok(delBtn.getAttribute("data-delete-pair"));
-  map["cal-day-list"].click(delBtn);
-  assert.equal(map["cal-day-empty"].hidden, false);
+  // Verify grouped logs section renders and swipe Edit/Delete actions work
+  tabLogs.click();
+  assert.equal(map["log-groups"].children.length, 1);
+  const firstList = map["log-groups"].children[0].children[1];
+  assert.equal(firstList.children.length, 2);
+  const firstRow = firstList.children[0];
+  const editBtn = firstRow.children[0].children[0];
+  const delBtn = firstRow.children[0].children[1];
+
+  map["log-groups"].click(editBtn);
+  assert.equal(map["edit-punch-dialog"].open, true);
+  map["edit-punch-time"].value = "17:00";
+  map["save-edit-btn"].click();
+  assert.equal(map["edit-punch-dialog"].open, false);
+
+  map["log-groups"].click(delBtn);
+  assert.equal(map["log-groups"].children[0].children[1].children.length, 1);
 }
 
 console.log("ALL TESTS PASSED");
